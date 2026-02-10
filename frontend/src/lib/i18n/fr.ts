@@ -58,6 +58,7 @@ const fr = {
   "nav.qrCodes": "QR Codes",
   "nav.activity": "Journal d'activité",
   "nav.settings": "Paramètres",
+  "nav.superAdmin": "Super Admin",
 
   // Dashboard
   "dashboard.title": "Tableau de bord",
@@ -88,7 +89,8 @@ const fr = {
   "orders.allStatuses": "Tous les statuts",
   "orders.noOrders": "Aucune commande trouvée",
   "orders.activeOrderBanner": "Cette table a déjà une commande active",
-  "orders.itemsWillBeAdded": "Les nouveaux articles seront ajoutés à cette commande.",
+  "orders.itemsWillBeAdded":
+    "Les nouveaux articles seront ajoutés à cette commande.",
   "orders.table": "Table",
   "orders.activeOrder": "commande active",
   "orders.takeaway": "À emporter",
@@ -261,6 +263,41 @@ const fr = {
   "notifications.newOrder": "Nouvelle commande",
   "notifications.orderReady": "Commande prête",
   "notifications.lowStock": "Stock faible",
+
+  // Super Admin
+  "superAdmin.title": "Gestion de la plateforme",
+  "superAdmin.restaurants": "Restaurants",
+  "superAdmin.totalRestaurants": "Total restaurants",
+  "superAdmin.activeRestaurants": "Restaurants actifs",
+  "superAdmin.totalUsers": "Total utilisateurs",
+  "superAdmin.totalOrders": "Total commandes",
+  "superAdmin.todayOrders": "Commandes du jour",
+  "superAdmin.todayRevenue": "CA du jour (plateforme)",
+  "superAdmin.createRestaurant": "Créer un restaurant",
+  "superAdmin.restaurantName": "Nom du restaurant",
+  "superAdmin.slug": "Identifiant (slug)",
+  "superAdmin.city": "Ville",
+  "superAdmin.country": "Pays",
+  "superAdmin.plan": "Forfait",
+  "superAdmin.adminEmail": "Email de l'admin",
+  "superAdmin.adminPassword": "Mot de passe admin",
+  "superAdmin.adminFirstName": "Prénom de l'admin",
+  "superAdmin.adminLastName": "Nom de l'admin",
+  "superAdmin.adminPhone": "Téléphone de l'admin",
+  "superAdmin.suspend": "Suspendre",
+  "superAdmin.activate": "Activer",
+  "superAdmin.deleteConfirm":
+    "Supprimer ce restaurant ? Cette action est irréversible.",
+  "superAdmin.users": "Utilisateurs",
+  "superAdmin.orders": "Commandes",
+  "superAdmin.tables": "Tables",
+  "superAdmin.menuItems": "Articles menu",
+  "superAdmin.revenue": "CA du jour",
+  "superAdmin.created": "Créé le",
+  "superAdmin.noRestaurants": "Aucun restaurant",
+  "superAdmin.planFree": "Gratuit",
+  "superAdmin.planStandard": "Standard",
+  "superAdmin.planPremium": "Premium",
 };
 
 export default fr;

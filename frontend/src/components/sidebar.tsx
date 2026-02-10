@@ -23,6 +23,7 @@ import {
   Settings,
   BookOpen,
   Activity,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -125,6 +126,12 @@ const navItems = [
     labelKey: "nav.settings" as TranslationKey,
     icon: Settings,
     roles: ["SUPER_ADMIN", "ADMIN"],
+  },
+  {
+    href: "/super-admin",
+    labelKey: "nav.superAdmin" as TranslationKey,
+    icon: Shield,
+    roles: ["SUPER_ADMIN"],
   },
 ];
 

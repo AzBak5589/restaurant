@@ -12,9 +12,11 @@ import customerRoutes from "./customer.routes";
 import digitalMenuRoutes from "./digitalmenu.routes";
 import recipeRoutes from "./recipe.routes";
 import activityRoutes from "./activity.routes";
+import superadminRoutes from "./superadmin.routes";
 
 const router = Router();
 
+router.use("/super-admin", superadminRoutes);
 router.use("/auth", authRoutes);
 router.use("/orders", orderRoutes);
 router.use("/menu", menuRoutes);

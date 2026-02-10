@@ -58,6 +58,7 @@ const en = {
   "nav.qrCodes": "QR Codes",
   "nav.activity": "Activity Log",
   "nav.settings": "Settings",
+  "nav.superAdmin": "Super Admin",
 
   // Dashboard
   "dashboard.title": "Dashboard",
@@ -261,6 +262,41 @@ const en = {
   "notifications.newOrder": "New order",
   "notifications.orderReady": "Order ready",
   "notifications.lowStock": "Low stock",
+
+  // Super Admin
+  "superAdmin.title": "Platform Management",
+  "superAdmin.restaurants": "Restaurants",
+  "superAdmin.totalRestaurants": "Total Restaurants",
+  "superAdmin.activeRestaurants": "Active Restaurants",
+  "superAdmin.totalUsers": "Total Users",
+  "superAdmin.totalOrders": "Total Orders",
+  "superAdmin.todayOrders": "Today's Orders",
+  "superAdmin.todayRevenue": "Today's Revenue (Platform)",
+  "superAdmin.createRestaurant": "Create Restaurant",
+  "superAdmin.restaurantName": "Restaurant Name",
+  "superAdmin.slug": "Slug (identifier)",
+  "superAdmin.city": "City",
+  "superAdmin.country": "Country",
+  "superAdmin.plan": "Plan",
+  "superAdmin.adminEmail": "Admin Email",
+  "superAdmin.adminPassword": "Admin Password",
+  "superAdmin.adminFirstName": "Admin First Name",
+  "superAdmin.adminLastName": "Admin Last Name",
+  "superAdmin.adminPhone": "Admin Phone",
+  "superAdmin.suspend": "Suspend",
+  "superAdmin.activate": "Activate",
+  "superAdmin.deleteConfirm":
+    "Delete this restaurant? This action is irreversible.",
+  "superAdmin.users": "Users",
+  "superAdmin.orders": "Orders",
+  "superAdmin.tables": "Tables",
+  "superAdmin.menuItems": "Menu Items",
+  "superAdmin.revenue": "Today's Revenue",
+  "superAdmin.created": "Created",
+  "superAdmin.noRestaurants": "No restaurants",
+  "superAdmin.planFree": "Free",
+  "superAdmin.planStandard": "Standard",
+  "superAdmin.planPremium": "Premium",
 };
 
 export default en;
