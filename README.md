@@ -5,6 +5,7 @@ A comprehensive multi-tenant restaurant management system built with Express.js,
 ## 🚀 Features
 
 ### Phase 1: MVP (Core Features)
+
 - ✅ Multi-tenant architecture with data isolation
 - ✅ JWT authentication with role-based access control (RBAC)
 - ✅ Order management system with real-time updates
@@ -13,6 +14,7 @@ A comprehensive multi-tenant restaurant management system built with Express.js,
 - ✅ WebSocket support for real-time notifications
 
 ### Upcoming Features
+
 - 📦 Inventory management with automatic stock deduction
 - 💰 POS/Cashier module with receipt printing
 - 👥 Staff management and scheduling
@@ -25,6 +27,7 @@ A comprehensive multi-tenant restaurant management system built with Express.js,
 ## 🛠️ Tech Stack
 
 ### Backend
+
 - **Framework**: Express.js with TypeScript
 - **Database**: PostgreSQL (Prisma ORM)
 - **Cache/Queue**: Redis + Bull
@@ -33,6 +36,7 @@ A comprehensive multi-tenant restaurant management system built with Express.js,
 - **Validation**: Zod
 
 ### Frontend (Coming Soon)
+
 - **Framework**: Next.js 14+ (App Router)
 - **UI**: TailwindCSS + shadcn/ui
 - **State**: React Query + Zustand
@@ -40,7 +44,7 @@ A comprehensive multi-tenant restaurant management system built with Express.js,
 
 ## 📋 Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - PostgreSQL 14+
 - Redis 6+
 - npm or yarn
@@ -48,22 +52,26 @@ A comprehensive multi-tenant restaurant management system built with Express.js,
 ## 🔧 Installation
 
 1. **Clone the repository**
+
 ```bash
 git clone <repository-url>
 cd windsurf-project
 ```
 
 2. **Install dependencies**
+
 ```bash
 npm install
 ```
 
 3. **Set up environment variables**
+
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` with your configuration:
+
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/restaurant_pos"
 REDIS_HOST=localhost
@@ -73,16 +81,19 @@ JWT_REFRESH_SECRET=your-refresh-secret
 ```
 
 4. **Generate Prisma client**
+
 ```bash
 npm run prisma:generate
 ```
 
 5. **Run database migrations**
+
 ```bash
 npm run prisma:migrate
 ```
 
 6. **Start the development server**
+
 ```bash
 npm run dev
 ```
@@ -94,6 +105,7 @@ The API will be available at `http://localhost:3000/api/v1`
 ### Authentication
 
 #### Register User
+
 ```http
 POST /api/v1/auth/register
 Content-Type: application/json
@@ -109,6 +121,7 @@ Content-Type: application/json
 ```
 
 #### Login
+
 ```http
 POST /api/v1/auth/login
 Content-Type: application/json
@@ -121,6 +134,7 @@ Content-Type: application/json
 ```
 
 #### Get Profile
+
 ```http
 GET /api/v1/auth/profile
 Authorization: Bearer <access_token>
@@ -129,6 +143,7 @@ Authorization: Bearer <access_token>
 ### Orders
 
 #### Create Order
+
 ```http
 POST /api/v1/orders
 Authorization: Bearer <access_token>
@@ -150,12 +165,14 @@ Content-Type: application/json
 ```
 
 #### Get Orders
+
 ```http
 GET /api/v1/orders?status=PENDING&date=2024-01-15
 Authorization: Bearer <access_token>
 ```
 
 #### Update Order Status
+
 ```http
 PATCH /api/v1/orders/:id/status
 Authorization: Bearer <access_token>
@@ -169,12 +186,14 @@ Content-Type: application/json
 ### Menu
 
 #### Get Categories
+
 ```http
 GET /api/v1/menu/categories
 Authorization: Bearer <access_token>
 ```
 
 #### Create Menu Item
+
 ```http
 POST /api/v1/menu/items
 Authorization: Bearer <access_token>
@@ -248,12 +267,14 @@ The system uses a multi-tenant architecture where all data is isolated by `resta
 ## 🚀 Deployment
 
 ### Production Build
+
 ```bash
 npm run build
 npm start
 ```
 
 ### Environment Variables for Production
+
 - Set `NODE_ENV=production`
 - Use strong JWT secrets
 - Configure proper CORS origins
@@ -281,4 +302,4 @@ Contributions are welcome! Please read the contributing guidelines first.
 
 ## 📞 Support
 
-For support, email support@restaurant-pos.com or open an issue.
+For support, email sinbak0@outlook.fr or open an issue.
