@@ -25,20 +25,30 @@ async function main() {
   });
   console.log("✅ Restaurant created:", restaurant.name);
 
-  // ── Users (all 7 roles) ──
+  // ── Users ──
   const hashedPassword = await bcrypt.hash("password123", 10);
+
+  // Platform-level Super Admin (no restaurant)
+  const superAdmin = await prisma.user.create({
+    data: {
+      email: "superadmin@restopo.com",
+      password: hashedPassword,
+      firstName: "Aziz",
+      lastName: "Bakayoko",
+      phone: "+225 0141152544",
+      role: "SUPER_ADMIN",
+      isActive: true,
+    },
+  });
+  console.log("✅ Super Admin created:", superAdmin.email, "(no restaurant)");
 
   const users: Record<
     string,
     Awaited<ReturnType<typeof prisma.user.create>>
   > = {};
+  users["SUPER_ADMIN"] = superAdmin;
+
   const userDefs = [
-    {
-      email: "superadmin@demo-restaurant.com",
-      firstName: "Super",
-      lastName: "Admin",
-      role: "SUPER_ADMIN" as const,
-    },
     {
       email: "admin@demo-restaurant.com",
       firstName: "Admin",
@@ -1076,7 +1086,9 @@ async function main() {
   console.log("═══════════════════════════════════════════════════");
   console.log("  📝 LOGIN CREDENTIALS (password: password123)");
   console.log("═══════════════════════════════════════════════════");
-  console.log("  SUPER_ADMIN  → superadmin@demo-restaurant.com");
+  console.log(
+    "  🛡️  SUPER_ADMIN  → superadmin@restopo.com (no Restaurant ID needed)",
+  );
   console.log("  ADMIN        → admin@demo-restaurant.com");
   console.log("  MANAGER      → manager@demo-restaurant.com");
   console.log("  CASHIER      → cashier@demo-restaurant.com");

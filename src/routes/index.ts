@@ -13,10 +13,12 @@ import digitalMenuRoutes from "./digitalmenu.routes";
 import recipeRoutes from "./recipe.routes";
 import activityRoutes from "./activity.routes";
 import superadminRoutes from "./superadmin.routes";
+import restaurantRoutes from "./restaurant.routes";
 
 const router = Router();
 
 router.use("/super-admin", superadminRoutes);
+router.use("/restaurants", restaurantRoutes);
 router.use("/auth", authRoutes);
 router.use("/orders", orderRoutes);
 router.use("/menu", menuRoutes);

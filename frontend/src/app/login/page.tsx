@@ -60,14 +60,16 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="restaurantId" className="text-slate-300">
-                Restaurant ID
+                Restaurant ID{" "}
+                <span className="text-xs text-slate-500 font-normal">
+                  (Super Admin: laisser vide)
+                </span>
               </Label>
               <Input
                 id="restaurantId"
                 value={restaurantId}
                 onChange={(e) => setRestaurantId(e.target.value)}
                 placeholder="ID du restaurant"
-                required
                 className="border-slate-600 bg-slate-700/50 text-white placeholder:text-slate-500"
               />
             </div>

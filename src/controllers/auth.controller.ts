@@ -1,12 +1,13 @@
-import { Request, Response } from 'express';
-import prisma from '../config/database';
-import { hashPassword, comparePassword } from '../utils/password';
-import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
-import { AppError } from '../middlewares/error.middleware';
+import { Request, Response } from "express";
+import prisma from "../config/database";
+import { hashPassword, comparePassword } from "../utils/password";
+import { generateAccessToken, generateRefreshToken } from "../utils/jwt";
+import { AppError } from "../middlewares/error.middleware";
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, firstName, lastName, phone, role, restaurantId } = req.body;
+    const { email, password, firstName, lastName, phone, role, restaurantId } =
+      req.body;
 
     const existingUser = await prisma.user.findUnique({
       where: {
@@ -18,7 +19,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     if (existingUser) {
-      throw new AppError('User already exists', 400);
+      throw new AppError("User already exists", 400);
     }
 
     const hashedPassword = await hashPassword(password);
@@ -71,27 +72,32 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password, restaurantId } = req.body;
 
-    const user = await prisma.user.findUnique({
-      where: {
-        restaurantId_email: {
-          restaurantId,
-          email,
-        },
-      },
-    });
+    // SUPER_ADMIN can login without restaurantId (email-only lookup)
+    const user = restaurantId
+      ? await prisma.user.findUnique({
+          where: {
+            restaurantId_email: {
+              restaurantId,
+              email,
+            },
+          },
+        })
+      : await prisma.user.findFirst({
+          where: { email, role: "SUPER_ADMIN", restaurantId: null },
+        });
 
     if (!user) {
-      throw new AppError('Invalid credentials', 401);
+      throw new AppError("Invalid credentials", 401);
     }
 
     if (!user.isActive) {
-      throw new AppError('Account is inactive', 403);
+      throw new AppError("Account is inactive", 403);
     }
 
     const isPasswordValid = await comparePassword(password, user.password);
 
     if (!isPasswordValid) {
-      throw new AppError('Invalid credentials', 401);
+      throw new AppError("Invalid credentials", 401);
     }
 
     await prisma.user.update({
@@ -130,7 +136,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const getProfile = async (req: Request, res: Response): Promise<void> => {
+export const getProfile = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
@@ -155,7 +164,7 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
     });
 
     if (!user) {
-      throw new AppError('User not found', 404);
+      throw new AppError("User not found", 404);
     }
 
     res.json(user);
