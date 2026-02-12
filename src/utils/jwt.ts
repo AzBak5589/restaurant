@@ -4,7 +4,7 @@ import { UserRole } from "@prisma/client";
 
 export interface JWTPayload {
   id: string;
-  restaurantId: string;
+  restaurantId: string | null;
   email: string;
   role: UserRole;
 }

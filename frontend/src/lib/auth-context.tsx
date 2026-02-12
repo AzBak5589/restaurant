@@ -1,8 +1,14 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import Cookies from 'js-cookie';
-import api from './api';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import Cookies from "js-cookie";
+import api from "./api";
 
 interface User {
   id: string;
@@ -10,13 +16,17 @@ interface User {
   firstName: string;
   lastName: string;
   role: string;
-  restaurantId: string;
+  restaurantId: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string, restaurantId: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    restaurantId?: string,
+  ) => Promise<User>;
   logout: () => void;
 }
 
@@ -27,13 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = Cookies.get('accessToken');
+    const token = Cookies.get("accessToken");
     if (token) {
-      api.get('/auth/profile')
+      api
+        .get("/auth/profile")
         .then((res) => setUser(res.data))
         .catch(() => {
-          Cookies.remove('accessToken');
-          Cookies.remove('refreshToken');
+          Cookies.remove("accessToken");
+          Cookies.remove("refreshToken");
         })
         .finally(() => setLoading(false));
     } else {
@@ -41,18 +52,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string, restaurantId: string) => {
-    const res = await api.post('/auth/login', { email, password, restaurantId });
-    Cookies.set('accessToken', res.data.accessToken, { expires: 7 });
-    Cookies.set('refreshToken', res.data.refreshToken, { expires: 30 });
+  const login = async (
+    email: string,
+    password: string,
+    restaurantId?: string,
+  ): Promise<User> => {
+    const body: Record<string, string> = { email, password };
+    if (restaurantId) body.restaurantId = restaurantId;
+    const res = await api.post("/auth/login", body);
+    Cookies.set("accessToken", res.data.accessToken, { expires: 7 });
+    Cookies.set("refreshToken", res.data.refreshToken, { expires: 30 });
     setUser(res.data.user);
+    return res.data.user;
   };
 
   const logout = () => {
-    Cookies.remove('accessToken');
-    Cookies.remove('refreshToken');
+    Cookies.remove("accessToken");
+    Cookies.remove("refreshToken");
     setUser(null);
-    window.location.href = '/login';
+    window.location.href = "/login";
   };
 
   return (
@@ -64,6 +82,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 }
