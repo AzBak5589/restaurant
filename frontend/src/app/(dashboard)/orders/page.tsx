@@ -58,6 +58,7 @@ interface MenuItemOption {
   id: string;
   name: string;
   price: number;
+  isAvailable: boolean;
   category: { name: string };
 }
 
@@ -301,8 +302,16 @@ export default function OrdersPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {menuItems.map((mi) => (
-                            <SelectItem key={mi.id} value={mi.id}>
+                            <SelectItem
+                              key={mi.id}
+                              value={mi.id}
+                              disabled={!mi.isAvailable}
+                              className={
+                                !mi.isAvailable ? "opacity-50 line-through" : ""
+                              }
+                            >
                               {mi.name} - {mi.price.toLocaleString()} FCFA
+                              {!mi.isAvailable ? " (Indisponible)" : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>

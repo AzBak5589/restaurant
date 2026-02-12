@@ -21,10 +21,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, RefreshCw, Users } from "lucide-react";
+import { Plus, RefreshCw, Users, UserPlus, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { useRouter } from "next/navigation";
+
+interface TableOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  total: number;
+  guestCount: number;
+}
+
+interface TableReservation {
+  id: string;
+  customerName: string;
+  guestCount: number;
+  startTime: string;
+  status: string;
+}
 
 interface Table {
   id: string;
@@ -33,6 +50,8 @@ interface Table {
   zone: string;
   status: string;
   isActive: boolean;
+  orders?: TableOrder[];
+  reservations?: TableReservation[];
 }
 
 const statusConfig: Record<string, { color: string; bg: string }> = {
@@ -59,6 +78,17 @@ export default function TablesPage() {
   });
   const [creating, setCreating] = useState(false);
   const { t } = useI18n();
+  const router = useRouter();
+
+  // Seat client dialog
+  const [seatOpen, setSeatOpen] = useState(false);
+  const [seatTableId, setSeatTableId] = useState("");
+  const [seatTableNumber, setSeatTableNumber] = useState("");
+  const [seatForm, setSeatForm] = useState({
+    customerName: "",
+    guestCount: "2",
+  });
+  const [seating, setSeating] = useState(false);
 
   const fetchTables = async () => {
     setLoading(true);
@@ -102,6 +132,33 @@ export default function TablesPage() {
       fetchTables();
     } catch {
       toast.error(t("common.noResults"));
+    }
+  };
+
+  const openSeatDialog = (table: Table) => {
+    setSeatTableId(table.id);
+    setSeatTableNumber(table.number);
+    setSeatForm({ customerName: "", guestCount: "2" });
+    setSeatOpen(true);
+  };
+
+  const seatClient = async () => {
+    if (!seatForm.customerName.trim()) {
+      toast.error("Customer name is required");
+      return;
+    }
+    setSeating(true);
+    try {
+      await api.patch(`/tables/${seatTableId}/status`, { status: "OCCUPIED" });
+      toast.success(
+        `Table ${seatTableNumber} — ${seatForm.customerName} seated`,
+      );
+      setSeatOpen(false);
+      fetchTables();
+    } catch {
+      toast.error("Failed to seat client");
+    } finally {
+      setSeating(false);
     }
   };
 
@@ -173,6 +230,46 @@ export default function TablesPage() {
         </div>
       </div>
 
+      {/* Seat Client Dialog */}
+      <Dialog open={seatOpen} onOpenChange={setSeatOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              <UserPlus className="mr-2 inline h-5 w-5" />
+              Seat Client — Table {seatTableNumber}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Customer Name *</Label>
+              <Input
+                value={seatForm.customerName}
+                onChange={(e) =>
+                  setSeatForm({ ...seatForm, customerName: e.target.value })
+                }
+                placeholder="Walk-in client name"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Guests</Label>
+              <Input
+                type="number"
+                min="1"
+                value={seatForm.guestCount}
+                onChange={(e) =>
+                  setSeatForm({ ...seatForm, guestCount: e.target.value })
+                }
+              />
+            </div>
+            <Button className="w-full" onClick={seatClient} disabled={seating}>
+              <UserPlus className="mr-1 h-4 w-4" />
+              {seating ? "Seating..." : "Seat Client"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex gap-3">
         {Object.entries(statusConfig).map(([status, config]) => {
           const count = tables.filter((t) => t.status === status).length;
@@ -206,11 +303,13 @@ export default function TablesPage() {
                 .map((table) => {
                   const sc =
                     statusConfig[table.status] || statusConfig.AVAILABLE;
+                  const activeOrder = table.orders?.[0];
+                  const nextReservation = table.reservations?.[0];
                   return (
                     <Card
                       key={table.id}
                       className={cn(
-                        "cursor-pointer border-2 transition-all hover:shadow-md",
+                        "border-2 transition-all hover:shadow-md",
                         sc.bg,
                       )}
                     >
@@ -227,16 +326,66 @@ export default function TablesPage() {
                         >
                           {t(`tables.${table.status}` as any)}
                         </Badge>
+
+                        {/* Active order info */}
+                        {activeOrder && table.status === "OCCUPIED" && (
+                          <div className="mt-2 rounded border bg-background/50 px-2 py-1 text-xs text-muted-foreground">
+                            <ShoppingCart className="mr-1 inline h-3 w-3" />
+                            {activeOrder.orderNumber} —{" "}
+                            {activeOrder.total.toLocaleString()} FCFA
+                          </div>
+                        )}
+
+                        {/* Next reservation info */}
+                        {nextReservation && table.status === "RESERVED" && (
+                          <div className="mt-2 rounded border bg-background/50 px-2 py-1 text-xs text-muted-foreground">
+                            {nextReservation.customerName} (
+                            {nextReservation.guestCount}p)
+                            <br />
+                            {new Date(
+                              nextReservation.startTime,
+                            ).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                        )}
+
                         <div className="mt-3 flex flex-col gap-1">
-                          {table.status === "OCCUPIED" && (
+                          {table.status === "AVAILABLE" && (
                             <Button
                               size="sm"
                               variant="outline"
                               className="text-xs"
-                              onClick={() => updateStatus(table.id, "CLEANING")}
+                              onClick={() => openSeatDialog(table)}
                             >
-                              {t("tables.CLEANING")}
+                              <UserPlus className="mr-1 h-3 w-3" /> Seat Client
                             </Button>
+                          )}
+                          {table.status === "OCCUPIED" && (
+                            <>
+                              {!activeOrder && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                  onClick={() => router.push("/orders")}
+                                >
+                                  <ShoppingCart className="mr-1 h-3 w-3" /> New
+                                  Order
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs"
+                                onClick={() =>
+                                  updateStatus(table.id, "CLEANING")
+                                }
+                              >
+                                {t("tables.CLEANING")}
+                              </Button>
+                            </>
                           )}
                           {table.status === "CLEANING" && (
                             <Button
