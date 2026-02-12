@@ -26,7 +26,7 @@ interface AuthContextType {
     email: string,
     password: string,
     restaurantId?: string,
-  ) => Promise<void>;
+  ) => Promise<User>;
   logout: () => void;
 }
 
@@ -56,13 +56,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     restaurantId?: string,
-  ) => {
+  ): Promise<User> => {
     const body: Record<string, string> = { email, password };
     if (restaurantId) body.restaurantId = restaurantId;
     const res = await api.post("/auth/login", body);
     Cookies.set("accessToken", res.data.accessToken, { expires: 7 });
     Cookies.set("refreshToken", res.data.refreshToken, { expires: 30 });
     setUser(res.data.user);
+    return res.data.user;
   };
 
   const logout = () => {

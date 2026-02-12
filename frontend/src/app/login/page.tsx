@@ -31,9 +31,9 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password, restaurantId);
+      const user = await login(email, password, restaurantId);
       toast.success(t("auth.welcomeBack"));
-      router.push("/dashboard");
+      router.push(user?.role === "SUPER_ADMIN" ? "/super-admin" : "/dashboard");
     } catch {
       toast.error(t("auth.loginError"));
     } finally {

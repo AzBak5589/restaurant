@@ -24,6 +24,10 @@ import {
   BookOpen,
   Activity,
   Shield,
+  Building2,
+  ScrollText,
+  Lock,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -32,7 +36,6 @@ import { NotificationBell } from "@/components/notification-bell";
 import { LanguageSwitcher } from "@/components/language-switcher";
 
 const ALL_ROLES = [
-  "SUPER_ADMIN",
   "ADMIN",
   "MANAGER",
   "CASHIER",
@@ -40,7 +43,41 @@ const ALL_ROLES = [
   "CHEF",
   "BARTENDER",
 ];
-const MANAGEMENT = ["SUPER_ADMIN", "ADMIN", "MANAGER"];
+const MANAGEMENT = ["ADMIN", "MANAGER"];
+
+// Dedicated Super Admin navigation
+const superAdminNav = [
+  {
+    href: "/super-admin",
+    labelKey: "superAdmin.dashboard" as TranslationKey,
+    icon: Gauge,
+  },
+  {
+    href: "/super-admin/restaurants",
+    labelKey: "superAdmin.restaurants" as TranslationKey,
+    icon: Building2,
+  },
+  {
+    href: "/super-admin/users",
+    labelKey: "superAdmin.allUsers" as TranslationKey,
+    icon: Users,
+  },
+  {
+    href: "/super-admin/logs",
+    labelKey: "superAdmin.logs" as TranslationKey,
+    icon: ScrollText,
+  },
+  {
+    href: "/super-admin/security",
+    labelKey: "superAdmin.security" as TranslationKey,
+    icon: Lock,
+  },
+  {
+    href: "/super-admin/settings",
+    labelKey: "superAdmin.platformSettings" as TranslationKey,
+    icon: Settings,
+  },
+];
 
 const navItems = [
   {
@@ -125,13 +162,7 @@ const navItems = [
     href: "/settings",
     labelKey: "nav.settings" as TranslationKey,
     icon: Settings,
-    roles: ["SUPER_ADMIN", "ADMIN"],
-  },
-  {
-    href: "/super-admin",
-    labelKey: "nav.superAdmin" as TranslationKey,
-    icon: Shield,
-    roles: ["SUPER_ADMIN"],
+    roles: ["ADMIN"],
   },
 ];
 
@@ -159,26 +190,55 @@ export default function Sidebar() {
       </div>
       <Separator />
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navItems
-          .filter((item) => !user?.role || item.roles.includes(user.role))
-          .map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {t(item.labelKey)}
-              </Link>
-            );
-          })}
+        {user?.role === "SUPER_ADMIN" && (
+          <>
+            <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Shield className="mr-1 inline h-3 w-3" /> Platform
+            </p>
+            {superAdminNav.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/super-admin" &&
+                  pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {t(item.labelKey)}
+                </Link>
+              );
+            })}
+          </>
+        )}
+        {user?.role !== "SUPER_ADMIN" &&
+          navItems
+            .filter((item) => !user?.role || item.roles.includes(user.role))
+            .map((item) => {
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {t(item.labelKey)}
+                </Link>
+              );
+            })}
       </nav>
       <Separator />
       <div className="px-4 py-4">
