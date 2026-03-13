@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface InventoryItem {
   id: string;
@@ -84,8 +85,6 @@ interface NewIngredient {
   unit: string;
 }
 
-const COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#d97706', '#059669', '#0891b2', '#4f46e5'];
-
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [costAnalysis, setCostAnalysis] = useState<CostAnalysis | null>(null);
@@ -111,8 +110,8 @@ export default function RecipesPage() {
       ]);
       setRecipes(recipesRes.data);
       setCostAnalysis(analysisRes.data);
-    } catch {
-      toast.error('Failed to load recipes');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to load recipes'));
     } finally {
       setLoading(false);
     }
@@ -199,8 +198,8 @@ export default function RecipesPage() {
       toast.success('Recipe created');
       setCreateOpen(false);
       fetchAll();
-    } catch {
-      toast.error('Failed to create recipe');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to create recipe'));
     } finally {
       setSaving(false);
     }
@@ -211,8 +210,8 @@ export default function RecipesPage() {
       await api.delete(`/recipes/${id}`);
       toast.success('Recipe deleted');
       fetchAll();
-    } catch {
-      toast.error('Failed to delete recipe');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to delete recipe'));
     }
   };
 
@@ -374,7 +373,7 @@ export default function RecipesPage() {
                       formatter={(value: number | undefined) => [`${(value ?? 0).toFixed(1)}%`, 'Margin']}
                     />
                     <Bar dataKey="marginPercent" radius={[0, 4, 4, 0]}>
-                      {costAnalysis.items.slice(0, 10).map((item, i) => (
+                      {costAnalysis.items.slice(0, 10).map((item) => (
                         <Cell
                           key={item.menuItemId}
                           fill={item.marginPercent >= 60 ? '#059669' : item.marginPercent >= 40 ? '#d97706' : '#dc2626'}

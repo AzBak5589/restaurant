@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/table';
 import { RefreshCw, Search, Power, PowerOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface UserRow {
   id: string;
@@ -60,6 +61,7 @@ export default function UsersPage() {
       fetchRestaurants();
       fetchUsers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchRestaurants = async () => {
@@ -78,8 +80,8 @@ export default function UsersPage() {
       if (search) params.set('search', search);
       const res = await api.get(`/super-admin/users?${params.toString()}`);
       setUsers(res.data);
-    } catch {
-      toast.error('Failed to load users');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to load users'));
     } finally {
       setLoading(false);
     }
@@ -87,6 +89,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleFilter, restaurantFilter]);
 
   const handleSearch = () => fetchUsers();
@@ -96,8 +99,8 @@ export default function UsersPage() {
       await api.patch(`/super-admin/users/${id}`, { isActive: !active });
       toast.success(!active ? t('superAdmin.activateUser') + ' ✓' : t('superAdmin.deactivateUser') + ' ✓');
       fetchUsers();
-    } catch {
-      toast.error('Failed to update user');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to update user'));
     }
   };
 

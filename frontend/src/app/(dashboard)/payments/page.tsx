@@ -23,6 +23,7 @@ import {
 import { CreditCard, DollarSign, Printer, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Receipt, ReceiptData } from "@/components/receipt";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface OrderItem {
   quantity: number;
@@ -61,8 +62,8 @@ export default function PaymentsPage() {
     try {
       const res = await api.get("/orders");
       setOrders(res.data.filter((o: Order) => o.paymentStatus !== "PAID"));
-    } catch {
-      toast.error("Failed to load orders");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load orders"));
     } finally {
       setLoading(false);
     }
@@ -82,10 +83,15 @@ export default function PaymentsPage() {
     if (!selectedOrder) return;
     setProcessing(true);
     try {
+      const idempotencyKey =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `pay-${selectedOrder.id}-${Date.now()}`;
       await api.post("/payments", {
         orderId: selectedOrder.id,
         amount: parseFloat(amount),
         method,
+        idempotencyKey,
       });
 
       const paid = parseFloat(amount);
@@ -119,8 +125,8 @@ export default function PaymentsPage() {
       setPayOpen(false);
       setReceiptOpen(true);
       fetchOrders();
-    } catch {
-      toast.error("Payment failed");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Payment failed"));
     } finally {
       setProcessing(false);
     }

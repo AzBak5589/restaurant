@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +33,7 @@ import {
   Ban,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface MenuItem {
   id: string;
@@ -92,8 +92,8 @@ export default function MenuPage() {
       if (res.data.length > 0 && !selectedCategoryId) {
         setSelectedCategoryId(res.data[0].id);
       }
-    } catch {
-      toast.error("Failed to load menu");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load menu"));
     } finally {
       setLoading(false);
     }
@@ -133,8 +133,8 @@ export default function MenuPage() {
       }
       setCatDialogOpen(false);
       fetchMenu();
-    } catch {
-      toast.error("Failed to save category");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to save category"));
     }
   };
 
@@ -150,8 +150,8 @@ export default function MenuPage() {
       toast.success(`"${catName}" deleted`);
       if (selectedCategoryId === catId) setSelectedCategoryId("");
       fetchMenu();
-    } catch {
-      toast.error("Failed to delete category");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to delete category"));
     }
   };
 
@@ -202,8 +202,8 @@ export default function MenuPage() {
       }
       setItemDialogOpen(false);
       fetchMenu();
-    } catch {
-      toast.error("Failed to save item");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to save item"));
     }
   };
 
@@ -213,8 +213,8 @@ export default function MenuPage() {
       await api.delete(`/menu/items/${itemId}`);
       toast.success(`"${itemName}" deleted`);
       fetchMenu();
-    } catch {
-      toast.error("Failed to delete item");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to delete item"));
     }
   };
 
@@ -223,8 +223,8 @@ export default function MenuPage() {
       await api.patch(`/menu/items/${itemId}`, { isAvailable: !isAvailable });
       toast.success(isAvailable ? "Marked unavailable" : "Marked available");
       fetchMenu();
-    } catch {
-      toast.error("Failed to update item");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to update item"));
     }
   };
 

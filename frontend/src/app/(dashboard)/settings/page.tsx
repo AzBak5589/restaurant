@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Building2, Globe, Save, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface RestaurantSettings {
   name: string;
@@ -80,8 +81,8 @@ export default function SettingsPage() {
     try {
       await api.patch('/restaurants/current', settings);
       toast.success('Restaurant settings saved');
-    } catch {
-      toast.error('Failed to save settings');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to save settings'));
     } finally {
       setSaving(false);
     }
@@ -92,8 +93,8 @@ export default function SettingsPage() {
     try {
       await api.patch('/staff/me', profileForm);
       toast.success('Profile updated');
-    } catch {
-      toast.error('Failed to update profile');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to update profile'));
     } finally {
       setSavingProfile(false);
     }

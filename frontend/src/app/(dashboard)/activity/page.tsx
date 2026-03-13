@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import {
   ClipboardList, CreditCard, CalendarClock, Package, RefreshCw, Activity,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface ActivityItem {
   id: string;
@@ -71,8 +71,8 @@ export default function ActivityPage() {
     try {
       const res = await api.get('/activity', { params: { limit: 100 } });
       setActivities(res.data);
-    } catch {
-      toast.error('Failed to load activity');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to load activity'));
     } finally {
       setLoading(false);
     }

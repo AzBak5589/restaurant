@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface TableOrder {
   id: string;
@@ -95,8 +96,8 @@ export default function TablesPage() {
     try {
       const res = await api.get("/tables");
       setTables(res.data);
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
     } finally {
       setLoading(false);
     }
@@ -104,6 +105,7 @@ export default function TablesPage() {
 
   useEffect(() => {
     fetchTables();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const createTable = async () => {
@@ -118,8 +120,8 @@ export default function TablesPage() {
       setCreateOpen(false);
       setForm({ number: "", capacity: "4", zone: "Main Hall" });
       fetchTables();
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
     } finally {
       setCreating(false);
     }
@@ -128,10 +130,10 @@ export default function TablesPage() {
   const updateStatus = async (id: string, status: string) => {
     try {
       await api.patch(`/tables/${id}/status`, { status });
-      toast.success(t(`tables.${status}` as any));
+      toast.success(t(`tables.${status}`));
       fetchTables();
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
     }
   };
 
@@ -155,8 +157,8 @@ export default function TablesPage() {
       );
       setSeatOpen(false);
       fetchTables();
-    } catch {
-      toast.error("Failed to seat client");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to seat client"));
     } finally {
       setSeating(false);
     }
@@ -280,7 +282,7 @@ export default function TablesPage() {
               className={`${config.bg} px-3 py-1`}
             >
               <span className={config.color}>
-                {t(`tables.${status}` as any)}: {count}
+                {t(`tables.${status}`)}: {count}
               </span>
             </Badge>
           );
@@ -324,7 +326,7 @@ export default function TablesPage() {
                           variant="outline"
                           className={`mt-2 text-xs ${sc.bg}`}
                         >
-                          {t(`tables.${table.status}` as any)}
+                          {t(`tables.${table.status}`)}
                         </Badge>
 
                         {/* Active order info */}

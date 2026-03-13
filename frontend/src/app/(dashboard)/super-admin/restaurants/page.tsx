@@ -32,6 +32,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface RestaurantRow {
   id: string;
@@ -85,8 +86,8 @@ export default function RestaurantsPage() {
     try {
       const res = await api.get('/super-admin/restaurants');
       setRestaurants(res.data);
-    } catch {
-      toast.error('Failed to load restaurants');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to load restaurants'));
     } finally {
       setLoading(false);
     }
@@ -108,9 +109,8 @@ export default function RestaurantsPage() {
       setCreateOpen(false);
       setForm({ ...emptyForm });
       fetchData();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to create restaurant';
-      toast.error(msg);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to create restaurant'));
     } finally {
       setCreating(false);
     }
@@ -121,7 +121,7 @@ export default function RestaurantsPage() {
       await api.patch(`/super-admin/restaurants/${id}`, { isActive: !active });
       toast.success(active ? t('superAdmin.suspend') + ' ✓' : t('superAdmin.activate') + ' ✓');
       fetchData();
-    } catch { toast.error('Failed to update'); }
+    } catch (error) { toast.error(getApiErrorMessage(error, 'Failed to update')); }
   };
 
   const deleteRestaurant = async (id: string, name: string) => {
@@ -130,7 +130,7 @@ export default function RestaurantsPage() {
       await api.delete(`/super-admin/restaurants/${id}`);
       toast.success(`"${name}" deleted`);
       fetchData();
-    } catch { toast.error('Failed to delete'); }
+    } catch (error) { toast.error(getApiErrorMessage(error, 'Failed to delete')); }
   };
 
   const copyId = (id: string) => { navigator.clipboard.writeText(id); toast.success('Restaurant ID copied!'); };

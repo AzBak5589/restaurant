@@ -42,8 +42,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface RevenueSummary {
   totalRevenue: number;
@@ -102,8 +102,8 @@ export default function ReportsPage() {
       setSummary(revRes.data.summary);
       setDaily(revRes.data.daily || []);
       setTopItems(topRes.data || []);
-    } catch {
-      toast.error("Failed to load reports");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load reports"));
     } finally {
       setLoading(false);
     }

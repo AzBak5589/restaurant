@@ -138,7 +138,7 @@ export default function DashboardPage() {
                   }
                   className="text-xs"
                 >
-                  {t(`tables.${status}` as any)}
+                  {t(`tables.${status}`)}
                 </Badge>
                 <span className="font-semibold">{count}</span>
               </div>

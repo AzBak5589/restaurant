@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { RefreshCw, ShoppingCart, UserPlus, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface LogEntry {
   type: string;
@@ -41,8 +42,8 @@ export default function LogsPage() {
     try {
       const res = await api.get('/super-admin/logs');
       setLogs(res.data);
-    } catch {
-      toast.error('Failed to load logs');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to load logs'));
     } finally {
       setLoading(false);
     }

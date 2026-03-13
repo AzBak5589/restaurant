@@ -30,6 +30,7 @@ import {
   Armchair,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface TableOption {
   id: string;
@@ -88,8 +89,8 @@ export default function ReservationsPage() {
     try {
       const res = await api.get("/reservations");
       setReservations(res.data);
-    } catch {
-      toast.error("Failed to load reservations");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load reservations"));
     } finally {
       setLoading(false);
     }
@@ -137,10 +138,8 @@ export default function ReservationsPage() {
         tableId: "",
       });
       fetchReservations();
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message || "Failed to create reservation",
-      );
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to create reservation"));
     } finally {
       setCreating(false);
     }
@@ -151,8 +150,8 @@ export default function ReservationsPage() {
       await api.patch(`/reservations/${id}/status`, { status });
       toast.success(`Reservation ${status.toLowerCase()}`);
       fetchReservations();
-    } catch {
-      toast.error("Failed to update reservation");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to update reservation"));
     }
   };
 
@@ -185,8 +184,8 @@ export default function ReservationsPage() {
       toast.success("Table assigned and client seated");
       setAssignOpen(false);
       fetchReservations();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to assign table");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to assign table"));
     }
   };
 

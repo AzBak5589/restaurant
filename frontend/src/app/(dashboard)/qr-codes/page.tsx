@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QrCode, RefreshCw, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface QRCodeData {
   tableId: string;
@@ -27,8 +28,8 @@ export default function QRCodesPage() {
     try {
       const res = await api.get('/digital-menu/qr', { params: { baseUrl } });
       setQrCodes(res.data);
-    } catch {
-      toast.error('Failed to generate QR codes');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to generate QR codes'));
     } finally {
       setLoading(false);
     }

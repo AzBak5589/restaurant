@@ -25,6 +25,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface SecurityData {
   totalUsers: number;
@@ -59,8 +60,8 @@ export default function SecurityPage() {
     try {
       const res = await api.get('/super-admin/security');
       setData(res.data);
-    } catch {
-      toast.error('Failed to load security data');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to load security data'));
     } finally {
       setLoading(false);
     }

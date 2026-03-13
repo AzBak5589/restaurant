@@ -20,6 +20,7 @@ import {
   HardDrive,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface PlatformStats {
   totalRestaurants: number;
@@ -71,8 +72,8 @@ export default function SuperAdminDashboard() {
       setStats(statsRes.data);
       setRestaurants(restRes.data);
       setLogs(logsRes.data.slice(0, 10));
-    } catch {
-      toast.error("Failed to load platform data");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load platform data"));
     } finally {
       setLoading(false);
     }
