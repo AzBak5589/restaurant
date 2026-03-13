@@ -1,15 +1,25 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
+import { parsePagination } from '../utils/pagination';
 
 export const getRecentActivity = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+  const { page, limit, skip } = parsePagination(
+    req.query.page,
+    req.query.limit,
+    100,
+    50,
+  );
+  const typeFilter = req.query.type as string | undefined;
+
+  // Fetch enough source rows to allow stable page slicing after merge/sort.
+  const sourceTake = Math.min(500, page * limit);
 
   const [orders, payments, reservations, inventoryMovements] = await Promise.all([
     prisma.order.findMany({
       where: { restaurantId },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: sourceTake,
       select: {
         id: true,
         orderNumber: true,
@@ -24,7 +34,7 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<vo
     prisma.payment.findMany({
       where: { order: { restaurantId } },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: sourceTake,
       select: {
         id: true,
         amount: true,
@@ -36,7 +46,7 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<vo
     prisma.reservation.findMany({
       where: { restaurantId },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: sourceTake,
       select: {
         id: true,
         customerName: true,
@@ -49,7 +59,7 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<vo
     prisma.inventoryMovement.findMany({
       where: { restaurantId },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: sourceTake,
       select: {
         id: true,
         type: true,
@@ -98,5 +108,9 @@ export const getRecentActivity = async (req: Request, res: Response): Promise<vo
 
   activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  res.json(activities.slice(0, limit));
+  const filteredActivities = typeFilter
+    ? activities.filter((activity) => activity.type === typeFilter)
+    : activities;
+
+  res.json(filteredActivities.slice(skip, skip + limit));
 };

@@ -28,19 +28,24 @@ interface LogEntry {
 }
 
 export default function LogsPage() {
+  const PAGE_SIZE = 30;
   const { user } = useAuth();
   const { t } = useI18n();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') fetchLogs();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, page]);
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/super-admin/logs');
+      const res = await api.get('/super-admin/logs', {
+        params: { page, limit: PAGE_SIZE },
+      });
       setLogs(res.data);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Failed to load logs'));
@@ -116,6 +121,25 @@ export default function LogsPage() {
           )}
         </CardContent>
       </Card>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1 || loading}
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-muted-foreground">Page {page}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => p + 1)}
+          disabled={loading || logs.length < PAGE_SIZE}
+        >
+          Next
+        </Button>
+      </div>
       <p className="text-xs text-muted-foreground">{logs.length} entries</p>
     </div>
   );

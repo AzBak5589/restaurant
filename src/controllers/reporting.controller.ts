@@ -1,6 +1,41 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
 
+const buildDateRange = (
+  query: Request['query'],
+): { start: Date; end: Date } => {
+  const { period, startDate, endDate } = query;
+
+  let start: Date;
+  let end: Date;
+
+  if (startDate && endDate) {
+    start = new Date(startDate as string);
+    end = new Date(endDate as string);
+  } else {
+    end = new Date();
+    start = new Date();
+    switch (period) {
+      case 'week':
+        start.setDate(start.getDate() - 7);
+        break;
+      case 'month':
+        start.setMonth(start.getMonth() - 1);
+        break;
+      case 'year':
+        start.setFullYear(start.getFullYear() - 1);
+        break;
+      default:
+        start.setDate(start.getDate() - 30);
+    }
+  }
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  return { start, end };
+};
+
 export const getDashboard = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
 
@@ -82,34 +117,7 @@ export const getDashboard = async (req: Request, res: Response): Promise<void> =
 
 export const getRevenueReport = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { period, startDate, endDate } = req.query;
-
-  let start: Date;
-  let end: Date;
-
-  if (startDate && endDate) {
-    start = new Date(startDate as string);
-    end = new Date(endDate as string);
-  } else {
-    end = new Date();
-    start = new Date();
-    switch (period) {
-      case 'week':
-        start.setDate(start.getDate() - 7);
-        break;
-      case 'month':
-        start.setMonth(start.getMonth() - 1);
-        break;
-      case 'year':
-        start.setFullYear(start.getFullYear() - 1);
-        break;
-      default:
-        start.setDate(start.getDate() - 30);
-    }
-  }
-
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
+  const { start, end } = buildDateRange(req.query);
 
   const orders = await prisma.order.findMany({
     where: {
@@ -167,50 +175,64 @@ export const getRevenueReport = async (req: Request, res: Response): Promise<voi
 
 export const getSalesByCategory = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { startDate, endDate } = req.query;
+  const { start, end } = buildDateRange(req.query);
 
-  const dateFilter: Record<string, unknown> = {};
-  if (startDate || endDate) {
-    dateFilter.createdAt = {
-      ...(startDate && { gte: new Date(startDate as string) }),
-      ...(endDate && { lte: new Date(endDate as string) }),
-    };
-  }
-
-  const orderItems = await prisma.orderItem.findMany({
+  const groupedItems = await prisma.orderItem.groupBy({
+    by: ['menuItemId'],
     where: {
       order: {
         restaurantId,
         paymentStatus: 'PAID',
-        ...dateFilter,
+        createdAt: { gte: start, lte: end },
       },
     },
-    include: {
-      menuItem: {
-        include: { category: { select: { id: true, name: true } } },
-      },
-    },
+    _sum: { total: true, quantity: true },
   });
 
-  const categoryMap: Record<string, { name: string; revenue: number; quantity: number; items: Record<string, { name: string; revenue: number; quantity: number }> }> = {};
+  const menuItemIds = groupedItems.map((item) => item.menuItemId);
+  const menuItems = await prisma.menuItem.findMany({
+    where: { id: { in: menuItemIds } },
+    select: {
+      id: true,
+      name: true,
+      category: { select: { id: true, name: true } },
+    },
+  });
+  const menuItemMap = new Map(menuItems.map((item) => [item.id, item]));
 
-  for (const item of orderItems) {
-    const catId = item.menuItem.category.id;
-    const catName = item.menuItem.category.name;
+  const categoryMap: Record<
+    string,
+    {
+      name: string;
+      revenue: number;
+      quantity: number;
+      items: Record<string, { name: string; revenue: number; quantity: number }>;
+    }
+  > = {};
+
+  for (const groupedItem of groupedItems) {
+    const menuItem = menuItemMap.get(groupedItem.menuItemId);
+    if (!menuItem) continue;
+
+    const catId = menuItem.category.id;
+    const catName = menuItem.category.name;
 
     if (!categoryMap[catId]) {
       categoryMap[catId] = { name: catName, revenue: 0, quantity: 0, items: {} };
     }
 
-    categoryMap[catId].revenue += item.total;
-    categoryMap[catId].quantity += item.quantity;
+    const revenue = groupedItem._sum.total || 0;
+    const quantity = groupedItem._sum.quantity || 0;
 
-    const itemId = item.menuItem.id;
+    categoryMap[catId].revenue += revenue;
+    categoryMap[catId].quantity += quantity;
+
+    const itemId = menuItem.id;
     if (!categoryMap[catId].items[itemId]) {
-      categoryMap[catId].items[itemId] = { name: item.menuItem.name, revenue: 0, quantity: 0 };
+      categoryMap[catId].items[itemId] = { name: menuItem.name, revenue: 0, quantity: 0 };
     }
-    categoryMap[catId].items[itemId].revenue += item.total;
-    categoryMap[catId].items[itemId].quantity += item.quantity;
+    categoryMap[catId].items[itemId].revenue += revenue;
+    categoryMap[catId].items[itemId].quantity += quantity;
   }
 
   const categories = Object.entries(categoryMap)
@@ -241,100 +263,111 @@ export const getSalesByCategory = async (req: Request, res: Response): Promise<v
 
 export const getTopSellingItems = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { limit, startDate, endDate } = req.query;
+  const { start, end } = buildDateRange(req.query);
+  const requestedLimit = parseInt((req.query.limit as string) || '20', 10);
+  const limit = Number.isNaN(requestedLimit)
+    ? 20
+    : Math.min(Math.max(requestedLimit, 1), 100);
 
-  const dateFilter: Record<string, unknown> = {};
-  if (startDate || endDate) {
-    dateFilter.createdAt = {
-      ...(startDate && { gte: new Date(startDate as string) }),
-      ...(endDate && { lte: new Date(endDate as string) }),
-    };
-  }
-
-  const orderItems = await prisma.orderItem.findMany({
+  const groupedItems = await prisma.orderItem.groupBy({
+    by: ['menuItemId'],
     where: {
       order: {
         restaurantId,
         paymentStatus: 'PAID',
-        ...dateFilter,
+        createdAt: { gte: start, lte: end },
       },
     },
-    include: {
-      menuItem: { select: { id: true, name: true, price: true, cost: true } },
+    _sum: {
+      total: true,
+      quantity: true,
     },
+    orderBy: {
+      _sum: { quantity: 'desc' },
+    },
+    take: limit,
   });
 
-  const itemMap: Record<string, { name: string; price: number; cost: number | null; revenue: number; quantity: number }> = {};
+  const menuItems = await prisma.menuItem.findMany({
+    where: { id: { in: groupedItems.map((item) => item.menuItemId) } },
+    select: { id: true, name: true, price: true, cost: true },
+  });
+  const menuItemMap = new Map(menuItems.map((item) => [item.id, item]));
 
-  for (const item of orderItems) {
-    const id = item.menuItem.id;
-    if (!itemMap[id]) {
-      itemMap[id] = {
-        name: item.menuItem.name,
-        price: item.menuItem.price,
-        cost: item.menuItem.cost,
-        revenue: 0,
-        quantity: 0,
+  const items = groupedItems
+    .map((groupedItem) => {
+      const menuItem = menuItemMap.get(groupedItem.menuItemId);
+      if (!menuItem) return null;
+
+      const revenue = groupedItem._sum.total || 0;
+      const quantity = groupedItem._sum.quantity || 0;
+
+      return {
+        menuItemId: menuItem.id,
+        name: menuItem.name,
+        price: menuItem.price,
+        cost: menuItem.cost,
+        revenue: Math.round(revenue * 100) / 100,
+        quantity,
+        profit: menuItem.cost
+          ? Math.round((revenue - menuItem.cost * quantity) * 100) / 100
+          : null,
       };
-    }
-    itemMap[id].revenue += item.total;
-    itemMap[id].quantity += item.quantity;
-  }
-
-  const items = Object.entries(itemMap)
-    .map(([id, data]) => ({
-      menuItemId: id,
-      name: data.name,
-      price: data.price,
-      cost: data.cost,
-      revenue: Math.round(data.revenue * 100) / 100,
-      quantity: data.quantity,
-      profit: data.cost
-        ? Math.round((data.revenue - data.cost * data.quantity) * 100) / 100
-        : null,
-    }))
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, parseInt((limit as string) || '20'));
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   res.json(items);
 };
 
 export const getTableTurnoverReport = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { startDate, endDate } = req.query;
+  const { start, end } = buildDateRange(req.query);
 
-  const dateFilter: Record<string, unknown> = {};
-  if (startDate || endDate) {
-    dateFilter.createdAt = {
-      ...(startDate && { gte: new Date(startDate as string) }),
-      ...(endDate && { lte: new Date(endDate as string) }),
-    };
-  }
-
-  const tables = await prisma.table.findMany({
-    where: { restaurantId, isActive: true },
-    include: {
-      orders: {
-        where: { paymentStatus: 'PAID', ...dateFilter },
-        select: { total: true, guestCount: true },
+  const [tables, tableOrderStats] = await Promise.all([
+    prisma.table.findMany({
+      where: { restaurantId, isActive: true },
+      select: {
+        id: true,
+        number: true,
+        zone: true,
+        capacity: true,
       },
-    },
-  });
+    }),
+    prisma.order.groupBy({
+      by: ['tableId'],
+      where: {
+        restaurantId,
+        paymentStatus: 'PAID',
+        createdAt: { gte: start, lte: end },
+        tableId: { not: null },
+      },
+      _count: { id: true },
+      _sum: { total: true, guestCount: true },
+    }),
+  ]);
+
+  const tableStatsMap = new Map(
+    tableOrderStats
+      .filter((stats) => stats.tableId !== null)
+      .map((stats) => [stats.tableId as string, stats]),
+  );
 
   const report = tables.map((table) => {
-    const totalRevenue = table.orders.reduce((sum, o) => sum + o.total, 0);
-    const totalGuests = table.orders.reduce((sum, o) => sum + o.guestCount, 0);
+    const stats = tableStatsMap.get(table.id);
+    const orderCount = stats?._count.id || 0;
+    const totalRevenue = stats?._sum.total || 0;
+    const totalGuests = stats?._sum.guestCount || 0;
 
     return {
       tableId: table.id,
       tableNumber: table.number,
       zone: table.zone,
       capacity: table.capacity,
-      orderCount: table.orders.length,
+      orderCount,
       totalRevenue: Math.round(totalRevenue * 100) / 100,
       totalGuests,
-      avgRevenuePerOrder: table.orders.length > 0
-        ? Math.round((totalRevenue / table.orders.length) * 100) / 100
+      avgRevenuePerOrder: orderCount > 0
+        ? Math.round((totalRevenue / orderCount) * 100) / 100
         : 0,
     };
   });

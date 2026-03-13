@@ -69,6 +69,7 @@ const emptyForm = {
 };
 
 export default function RestaurantsPage() {
+  const PAGE_SIZE = 12;
   const { user } = useAuth();
   const { t } = useI18n();
   const [restaurants, setRestaurants] = useState<RestaurantRow[]>([]);
@@ -76,15 +77,19 @@ export default function RestaurantsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') fetchData();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, page]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/super-admin/restaurants');
+      const res = await api.get('/super-admin/restaurants', {
+        params: { page, limit: PAGE_SIZE },
+      });
       setRestaurants(res.data);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Failed to load restaurants'));
@@ -108,6 +113,7 @@ export default function RestaurantsPage() {
       toast.success(`Restaurant "${form.name}" created!`);
       setCreateOpen(false);
       setForm({ ...emptyForm });
+      setPage(1);
       fetchData();
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Failed to create restaurant'));
@@ -129,6 +135,7 @@ export default function RestaurantsPage() {
     try {
       await api.delete(`/super-admin/restaurants/${id}`);
       toast.success(`"${name}" deleted`);
+      setPage(1);
       fetchData();
     } catch (error) { toast.error(getApiErrorMessage(error, 'Failed to delete')); }
   };
@@ -253,6 +260,25 @@ export default function RestaurantsPage() {
           ))}
         </div>
       )}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1 || loading}
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-muted-foreground">Page {page}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => p + 1)}
+          disabled={loading || restaurants.length < PAGE_SIZE}
+        >
+          Next
+        </Button>
+      </div>
     </div>
   );
 }

@@ -62,14 +62,21 @@ function groupByDate(items: ActivityItem[]): { label: string; items: ActivityIte
 }
 
 export default function ActivityPage() {
+  const PAGE_SIZE = 30;
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
 
   const fetchActivity = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/activity', { params: { limit: 100 } });
+      const params: Record<string, string | number> = {
+        page,
+        limit: PAGE_SIZE,
+      };
+      if (filter !== 'all') params.type = filter;
+      const res = await api.get('/activity', { params });
       setActivities(res.data);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Failed to load activity'));
@@ -78,17 +85,17 @@ export default function ActivityPage() {
     }
   };
 
-  useEffect(() => { fetchActivity(); }, []);
+  useEffect(() => { fetchActivity(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, page]);
 
-  const filtered = filter === 'all' ? activities : activities.filter((a) => a.type === filter);
-  const grouped = groupByDate(filtered);
+  const grouped = groupByDate(activities);
 
   const counts = {
-    all: activities.length,
-    order: activities.filter((a) => a.type === 'order').length,
-    payment: activities.filter((a) => a.type === 'payment').length,
-    reservation: activities.filter((a) => a.type === 'reservation').length,
-    inventory: activities.filter((a) => a.type === 'inventory').length,
+    all: filter === 'all' ? activities.length : 0,
+    order: filter === 'order' ? activities.length : 0,
+    payment: filter === 'payment' ? activities.length : 0,
+    reservation: filter === 'reservation' ? activities.length : 0,
+    inventory: filter === 'inventory' ? activities.length : 0,
   };
 
   return (
@@ -110,7 +117,10 @@ export default function ActivityPage() {
             key={type}
             variant={filter === type ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setFilter(type)}
+            onClick={() => {
+              setFilter(type);
+              setPage(1);
+            }}
           >
             {type === 'all' ? (
               <Activity className="mr-1 h-3.5 w-3.5" />
@@ -129,7 +139,7 @@ export default function ActivityPage() {
         <div className="flex h-40 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : activities.length === 0 ? (
         <Card>
           <CardContent className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
             <Activity className="h-8 w-8" />
@@ -174,6 +184,25 @@ export default function ActivityPage() {
           ))}
         </div>
       )}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1 || loading}
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-muted-foreground">Page {page}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => p + 1)}
+          disabled={loading || activities.length < PAGE_SIZE}
+        >
+          Next
+        </Button>
+      </div>
     </div>
   );
 }

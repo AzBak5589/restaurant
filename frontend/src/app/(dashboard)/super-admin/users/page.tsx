@@ -47,6 +47,7 @@ interface RestaurantOption {
 }
 
 export default function UsersPage() {
+  const PAGE_SIZE = 25;
   const { user } = useAuth();
   const { t } = useI18n();
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -55,11 +56,12 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [restaurantFilter, setRestaurantFilter] = useState('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') {
       fetchRestaurants();
-      fetchUsers();
+      fetchUsers(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -71,13 +73,15 @@ export default function UsersPage() {
     } catch { /* ignore */ }
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (targetPage: number = page) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (roleFilter !== 'all') params.set('role', roleFilter);
       if (restaurantFilter !== 'all') params.set('restaurantId', restaurantFilter);
       if (search) params.set('search', search);
+      params.set('page', String(targetPage));
+      params.set('limit', String(PAGE_SIZE));
       const res = await api.get(`/super-admin/users?${params.toString()}`);
       setUsers(res.data);
     } catch (error) {
@@ -90,9 +94,12 @@ export default function UsersPage() {
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFilter, restaurantFilter]);
+  }, [roleFilter, restaurantFilter, page]);
 
-  const handleSearch = () => fetchUsers();
+  const handleSearch = () => {
+    setPage(1);
+    fetchUsers(1);
+  };
 
   const toggleUserActive = async (id: string, active: boolean) => {
     try {
@@ -138,14 +145,26 @@ export default function UsersPage() {
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
         </div>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
+        <Select
+          value={roleFilter}
+          onValueChange={(value) => {
+            setRoleFilter(value);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-[180px]"><SelectValue placeholder={t('superAdmin.filterByRole')} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('superAdmin.allRoles')}</SelectItem>
             {roles.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={restaurantFilter} onValueChange={setRestaurantFilter}>
+        <Select
+          value={restaurantFilter}
+          onValueChange={(value) => {
+            setRestaurantFilter(value);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-[200px]"><SelectValue placeholder={t('superAdmin.filterByRestaurant')} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t('superAdmin.allRestaurants')}</SelectItem>
@@ -206,6 +225,25 @@ export default function UsersPage() {
           )}
         </CardContent>
       </Card>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1 || loading}
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-muted-foreground">Page {page}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => p + 1)}
+          disabled={loading || users.length < PAGE_SIZE}
+        >
+          Next
+        </Button>
+      </div>
       <p className="text-xs text-muted-foreground">{users.length} {t('superAdmin.users').toLowerCase()}</p>
     </div>
   );
