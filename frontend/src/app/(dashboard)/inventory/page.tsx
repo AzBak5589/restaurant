@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,15 +39,35 @@ import {
 import {
   Plus,
   RefreshCw,
-  AlertTriangle,
   Package,
   MoreVertical,
   Pencil,
   Trash2,
   ArrowUpCircle,
-  ArrowDownCircle,
+  History,
+  DollarSign,
+  TrendingDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
+
+interface Movement {
+  id: string;
+  type: string;
+  quantity: number;
+  unitCost: number | null;
+  totalCost: number | null;
+  reference: string | null;
+  notes: string | null;
+  createdAt: string;
+  item: { name: string; unit: string };
+}
+
+interface Valuation {
+  totalValue: number;
+  totalItems: number;
+  itemCount: number;
+}
 
 interface InventoryItem {
   id: string;
@@ -100,13 +120,22 @@ export default function InventoryPage() {
   });
   const [adjusting, setAdjusting] = useState(false);
 
+  // Movement history dialog
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Stock valuation
+  const [valuation, setValuation] = useState<Valuation | null>(null);
+
   const fetchItems = async () => {
     setLoading(true);
     try {
       const res = await api.get("/inventory/items");
       setItems(res.data);
-    } catch {
-      toast.error("Failed to load inventory");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load inventory"));
     } finally {
       setLoading(false);
     }
@@ -114,7 +143,33 @@ export default function InventoryPage() {
 
   useEffect(() => {
     fetchItems();
+    fetchValuation();
   }, []);
+
+  const fetchValuation = async () => {
+    try {
+      const res = await api.get("/inventory/valuation");
+      setValuation(res.data);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const openHistory = async (item: InventoryItem) => {
+    setHistoryItem(item);
+    setHistoryOpen(true);
+    setLoadingHistory(true);
+    try {
+      const res = await api.get("/inventory/movements", {
+        params: { itemId: item.id },
+      });
+      setMovements(res.data);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load history"));
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   // ─── CREATE ─────────────────────────────────────────────────
   const createItem = async () => {
@@ -138,8 +193,8 @@ export default function InventoryPage() {
       setCreateOpen(false);
       setForm({ ...emptyForm });
       fetchItems();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to create item");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to create item"));
     } finally {
       setCreating(false);
     }
@@ -197,8 +252,8 @@ export default function InventoryPage() {
       toast.success("Item updated");
       setEditOpen(false);
       fetchItems();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to update item");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to update item"));
     } finally {
       setSaving(false);
     }
@@ -211,8 +266,8 @@ export default function InventoryPage() {
       await api.delete(`/inventory/items/${id}`);
       toast.success(`"${name}" deleted`);
       fetchItems();
-    } catch {
-      toast.error("Failed to delete item");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to delete item"));
     }
   };
 
@@ -249,8 +304,8 @@ export default function InventoryPage() {
       toast.success(`${qty} ${stockItem.unit} ${label} — ${stockItem.name}`);
       setStockOpen(false);
       fetchItems();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Failed to adjust stock");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to adjust stock"));
     } finally {
       setAdjusting(false);
     }
@@ -529,7 +584,10 @@ export default function InventoryPage() {
                   <Select
                     value={stockForm.type}
                     onValueChange={(v) =>
-                      setStockForm({ ...stockForm, type: v as any })
+                      setStockForm({
+                        ...stockForm,
+                        type: v as "IN" | "OUT" | "LOSS" | "RETURN",
+                      })
                     }
                   >
                     <SelectTrigger>
@@ -583,17 +641,126 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      {lowStockCount > 0 && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="flex items-center gap-3 p-4">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <span className="font-medium text-amber-600">
-              {lowStockCount} item{lowStockCount > 1 ? "s" : ""} below minimum
-              stock level
-            </span>
-          </CardContent>
-        </Card>
-      )}
+      {/* Movement History Dialog */}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              <History className="mr-2 inline h-4 w-4" />
+              Movement History — {historyItem?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {loadingHistory ? (
+            <div className="flex h-32 items-center justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+          ) : movements.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground">
+              No movements recorded
+            </p>
+          ) : (
+            <div className="max-h-[400px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {movements.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(m.createdAt).toLocaleDateString()}{" "}
+                        {new Date(m.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${
+                            ["IN", "RETURN"].includes(m.type)
+                              ? "bg-emerald-500/10 text-emerald-600"
+                              : m.type === "TRANSFER"
+                                ? "bg-blue-500/10 text-blue-600"
+                                : "bg-red-500/10 text-red-600"
+                          }`}
+                        >
+                          {m.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-medium ${
+                          ["IN", "RETURN"].includes(m.type)
+                            ? "text-emerald-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {["IN", "RETURN"].includes(m.type) ? "+" : "-"}
+                        {m.quantity}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate">
+                        {m.notes || m.reference || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Valuation & Alert Cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {valuation && (
+          <>
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="rounded-lg bg-emerald-500/10 p-2">
+                  <DollarSign className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Stock Value</p>
+                  <p className="text-lg font-bold">
+                    {valuation.totalValue.toLocaleString()} FCFA
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="rounded-lg bg-blue-500/10 p-2">
+                  <Package className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Items Tracked</p>
+                  <p className="text-lg font-bold">{valuation.itemCount}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+        {lowStockCount > 0 && (
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="rounded-lg bg-amber-500/10 p-2">
+                <TrendingDown className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Low Stock</p>
+                <p className="text-lg font-bold text-amber-600">
+                  {lowStockCount} item{lowStockCount > 1 ? "s" : ""}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex h-40 items-center justify-center">
@@ -683,6 +850,9 @@ export default function InventoryPage() {
                           >
                             <ArrowUpCircle className="mr-2 h-4 w-4" /> Adjust
                             Stock
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openHistory(item)}>
+                            <History className="mr-2 h-4 w-4" /> History
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openEdit(item)}>
                             <Pencil className="mr-2 h-4 w-4" /> Edit

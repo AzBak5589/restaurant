@@ -21,9 +21,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, RefreshCw, UserCheck, UserX } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Plus,
+  RefreshCw,
+  UserCheck,
+  UserX,
+  MoreVertical,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface StaffMember {
   id: string;
@@ -45,28 +61,38 @@ const roleBadge: Record<string, string> = {
   BARTENDER: "bg-teal-500/10 text-teal-600",
 };
 
+const roles = ["ADMIN", "MANAGER", "CASHIER", "WAITER", "CHEF", "BARTENDER"];
+
+const emptyForm = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  role: "WAITER",
+  password: "",
+};
+
 export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    role: "WAITER",
-    password: "",
-  });
+  const [form, setForm] = useState({ ...emptyForm });
   const { t } = useI18n();
+
+  // Edit
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState("");
+  const [editForm, setEditForm] = useState({ ...emptyForm });
+  const [saving, setSaving] = useState(false);
 
   const fetchStaff = async () => {
     setLoading(true);
     try {
       const res = await api.get("/staff");
       setStaff(res.data);
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
     } finally {
       setLoading(false);
     }
@@ -74,27 +100,66 @@ export default function StaffPage() {
 
   useEffect(() => {
     fetchStaff();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const createStaff = async () => {
+    if (!form.firstName.trim() || !form.email.trim() || !form.password.trim()) {
+      toast.error("Name, email and password are required");
+      return;
+    }
     setCreating(true);
     try {
       await api.post("/staff", form);
       toast.success(t("staff.addMember") + " ✓");
       setCreateOpen(false);
-      setForm({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        role: "WAITER",
-        password: "",
-      });
+      setForm({ ...emptyForm });
       fetchStaff();
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to create staff"));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEdit = (s: StaffMember) => {
+    setEditId(s.id);
+    setEditForm({
+      firstName: s.firstName,
+      lastName: s.lastName,
+      email: s.email,
+      phone: s.phone || "",
+      role: s.role,
+      password: "",
+    });
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editForm.firstName.trim() || !editForm.email.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
+    setSaving(true);
+    try {
+      const data: Record<string, unknown> = {
+        firstName: editForm.firstName,
+        lastName: editForm.lastName,
+        email: editForm.email,
+        phone: editForm.phone || null,
+        role: editForm.role,
+      };
+      if (editForm.password.trim()) {
+        data.password = editForm.password;
+      }
+      await api.patch(`/staff/${editId}`, data);
+      toast.success("Staff updated");
+      setEditOpen(false);
+      fetchStaff();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to update staff"));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -103,8 +168,15 @@ export default function StaffPage() {
       await api.patch(`/staff/${id}/toggle-active`);
       toast.success(t("common.save") + " ✓");
       fetchStaff();
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
+    }
+  };
+
+  const deleteStaff = async (s: StaffMember) => {
+    if (!confirm(`Deactivate "${s.firstName} ${s.lastName}"?`)) return;
+    if (s.isActive) {
+      await toggleActive(s.id);
     }
   };
 
@@ -134,7 +206,7 @@ export default function StaffPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>{t("staff.firstName")}</Label>
+                    <Label>{t("staff.firstName")} *</Label>
                     <Input
                       value={form.firstName}
                       onChange={(e) =>
@@ -153,7 +225,7 @@ export default function StaffPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("common.email")}</Label>
+                  <Label>{t("common.email")} *</Label>
                   <Input
                     type="email"
                     value={form.email}
@@ -182,16 +254,9 @@ export default function StaffPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {[
-                          "ADMIN",
-                          "MANAGER",
-                          "CASHIER",
-                          "WAITER",
-                          "CHEF",
-                          "BARTENDER",
-                        ].map((r) => (
+                        {roles.map((r) => (
                           <SelectItem key={r} value={r}>
-                            {t(`staff.${r}` as any)}
+                            {t(`staff.${r}`)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -199,7 +264,7 @@ export default function StaffPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("auth.password")}</Label>
+                  <Label>{t("auth.password")} *</Label>
                   <Input
                     type="password"
                     value={form.password}
@@ -221,6 +286,93 @@ export default function StaffPage() {
         </div>
       </div>
 
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              <Pencil className="mr-2 inline h-4 w-4" />
+              Edit Staff Member
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>{t("staff.firstName")} *</Label>
+                <Input
+                  value={editForm.firstName}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, firstName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("staff.lastName")}</Label>
+                <Input
+                  value={editForm.lastName}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, lastName: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("common.email")} *</Label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, email: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>{t("common.phone")}</Label>
+                <Input
+                  value={editForm.phone}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, phone: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("staff.role")}</Label>
+                <Select
+                  value={editForm.role}
+                  onValueChange={(v) => setEditForm({ ...editForm, role: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {t(`staff.${r}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("auth.password")}</Label>
+              <Input
+                type="password"
+                value={editForm.password}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, password: e.target.value })
+                }
+                placeholder="Leave blank to keep current"
+              />
+            </div>
+            <Button className="w-full" onClick={saveEdit} disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {loading ? (
         <div className="flex h-40 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -234,9 +386,45 @@ export default function StaffPage() {
                   <CardTitle className="text-base">
                     {s.firstName} {s.lastName}
                   </CardTitle>
-                  <Badge variant="outline" className={roleBadge[s.role] || ""}>
-                    {t(`staff.${s.role}` as any)}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <Badge
+                      variant="outline"
+                      className={roleBadge[s.role] || ""}
+                    >
+                      {t(`staff.${s.role}`)}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(s)}>
+                          <Pencil className="mr-2 h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => toggleActive(s.id)}>
+                          {s.isActive ? (
+                            <UserX className="mr-2 h-4 w-4" />
+                          ) : (
+                            <UserCheck className="mr-2 h-4 w-4" />
+                          )}
+                          {s.isActive ? "Deactivate" : "Activate"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => deleteStaff(s)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -248,17 +436,11 @@ export default function StaffPage() {
                   <Badge variant={s.isActive ? "default" : "secondary"}>
                     {s.isActive ? t("common.active") : t("common.inactive")}
                   </Badge>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => toggleActive(s.id)}
-                  >
-                    {s.isActive ? (
-                      <UserX className="h-4 w-4" />
-                    ) : (
-                      <UserCheck className="h-4 w-4" />
-                    )}
-                  </Button>
+                  {s.lastLogin && (
+                    <span className="text-xs text-muted-foreground">
+                      Last: {new Date(s.lastLogin).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
               </CardContent>
             </Card>

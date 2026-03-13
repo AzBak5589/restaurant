@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, RefreshCw, Clock, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface OrderItem {
   id: string;
@@ -109,12 +110,12 @@ export default function OrdersPage() {
       if (statusFilter !== "all") params.status = statusFilter;
       const res = await api.get("/orders", { params });
       setOrders(res.data);
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, t]);
 
   useEffect(() => {
     fetchOrders();
@@ -194,8 +195,8 @@ export default function OrdersPage() {
       setGuestCount("1");
       setActiveTableOrder(null);
       fetchOrders();
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
     } finally {
       setCreating(false);
     }
@@ -204,10 +205,22 @@ export default function OrdersPage() {
   const updateStatus = async (orderId: string, status: string) => {
     try {
       await api.patch(`/orders/${orderId}/status`, { status });
-      toast.success(`${t(("status." + status) as any)}`);
+      toast.success(t(`status.${status}`));
       fetchOrders();
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
+    }
+  };
+
+  const cancelOrder = async (order: Order) => {
+    if (!confirm(`Cancel order ${order.orderNumber}? Stock will be restored.`))
+      return;
+    try {
+      await api.delete(`/orders/${order.id}`);
+      toast.success(`${order.orderNumber} cancelled`);
+      fetchOrders();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to cancel order"));
     }
   };
 
@@ -418,7 +431,7 @@ export default function OrdersPage() {
                     className={statusColors[order.status] || ""}
                     variant="outline"
                   >
-                    {t(`status.${order.status}` as any)}
+                    {t(`status.${order.status}`)}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -455,7 +468,7 @@ export default function OrdersPage() {
                       className={`ml-2 text-xs ${paymentColors[order.paymentStatus]}`}
                       variant="outline"
                     >
-                      {t(`payment.${order.paymentStatus}` as any)}
+                      {t(`payment.${order.paymentStatus}`)}
                     </Badge>
                   </div>
                 </div>
@@ -500,13 +513,14 @@ export default function OrdersPage() {
                       {t("action.served")}
                     </Button>
                   )}
-                  {(order.status === "PENDING" ||
-                    order.status === "CONFIRMED") && (
+                  {["PENDING", "CONFIRMED", "PREPARING"].includes(
+                    order.status,
+                  ) && (
                     <Button
                       size="sm"
                       variant="destructive"
                       className="flex-1"
-                      onClick={() => updateStatus(order.id, "CANCELLED")}
+                      onClick={() => cancelOrder(order)}
                     >
                       {t("action.cancel")}
                     </Button>
