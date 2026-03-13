@@ -1,12 +1,27 @@
 import { Request, Response } from "express";
 import prisma from "../config/database";
 import { AppError } from "../middlewares/error.middleware";
-import { OrderStatus, PaymentStatus } from "@prisma/client";
+import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { getIO } from "../config/socket";
 import {
   deductStockForOrder,
   restoreStockForOrder,
 } from "../services/inventory.service";
+
+const getNextOrderNumber = async (
+  tx: Prisma.TransactionClient,
+  restaurantId: string,
+): Promise<string> => {
+  const lastOrder = await tx.order.findFirst({
+    where: { restaurantId },
+    orderBy: { createdAt: "desc" },
+    select: { orderNumber: true },
+  });
+
+  return lastOrder
+    ? `ORD-${(parseInt(lastOrder.orderNumber.split("-")[1]) + 1).toString().padStart(6, "0")}`
+    : "ORD-000001";
+};
 
 export const createOrder = async (
   req: Request,
@@ -17,108 +32,137 @@ export const createOrder = async (
     const restaurantId = req.user!.restaurantId;
     const userId = req.user!.id;
 
-    const lastOrder = await prisma.order.findFirst({
-      where: { restaurantId },
-      orderBy: { createdAt: "desc" },
-      select: { orderNumber: true },
-    });
+    let order:
+      | (Prisma.OrderGetPayload<{
+          include: {
+            items: { include: { menuItem: true } };
+            table: true;
+            user: { select: { id: true; firstName: true; lastName: true } };
+          };
+        }> & { orderNumber: string })
+      | null = null;
 
-    const orderNumber = lastOrder
-      ? `ORD-${(parseInt(lastOrder.orderNumber.split("-")[1]) + 1).toString().padStart(6, "0")}`
-      : "ORD-000001";
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        order = await prisma.$transaction(
+          async (tx) => {
+            const orderNumber = await getNextOrderNumber(tx, restaurantId);
 
-    let subtotal = 0;
-    const orderItems = [];
+            let subtotal = 0;
+            const orderItems = [];
 
-    for (const item of items) {
-      const menuItem = await prisma.menuItem.findUnique({
-        where: { id: item.menuItemId },
-      });
+            for (const item of items) {
+              const menuItem = await tx.menuItem.findUnique({
+                where: { id: item.menuItemId },
+              });
 
-      if (!menuItem || !menuItem.isAvailable) {
-        throw new AppError(
-          `Menu item ${item.menuItemId} is not available`,
-          400,
+              if (!menuItem || !menuItem.isAvailable) {
+                throw new AppError(
+                  `Menu item ${item.menuItemId} is not available`,
+                  400,
+                );
+              }
+
+              const itemTotal = menuItem.price * item.quantity;
+              subtotal += itemTotal;
+
+              orderItems.push({
+                menuItemId: item.menuItemId,
+                quantity: item.quantity,
+                unitPrice: menuItem.price,
+                total: itemTotal,
+                modifiers: item.modifiers || null,
+                notes: item.notes || null,
+              });
+            }
+
+            const restaurant = await tx.restaurant.findUnique({
+              where: { id: restaurantId },
+              select: { taxRate: true, serviceCharge: true },
+            });
+
+            if (!restaurant) {
+              throw new AppError("Restaurant not found", 404);
+            }
+
+            const tax = subtotal * (restaurant.taxRate / 100);
+            const serviceCharge = subtotal * (restaurant.serviceCharge / 100);
+            const total = subtotal + tax + serviceCharge;
+
+            const createdOrder = await tx.order.create({
+              data: {
+                restaurantId,
+                tableId,
+                userId,
+                orderNumber,
+                status: OrderStatus.PENDING,
+                subtotal,
+                tax,
+                serviceCharge,
+                total,
+                guestCount: guestCount || 1,
+                notes,
+                paymentStatus: PaymentStatus.PENDING,
+                items: {
+                  create: orderItems,
+                },
+              },
+              include: {
+                items: {
+                  include: {
+                    menuItem: true,
+                  },
+                },
+                table: true,
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            });
+
+            if (tableId) {
+              await tx.table.update({
+                where: { id: tableId },
+                data: { status: "OCCUPIED" },
+              });
+            }
+
+            await deductStockForOrder(
+              restaurantId,
+              items.map((item: { menuItemId: string; quantity: number }) => ({
+                menuItemId: item.menuItemId,
+                quantity: item.quantity,
+              })),
+              userId,
+              orderNumber,
+              tx,
+            );
+
+            return createdOrder;
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         );
+        break;
+      } catch (error) {
+        const isUniqueConflict =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002";
+        if (isUniqueConflict && attempt < 2) {
+          continue;
+        }
+        throw error;
       }
-
-      const itemTotal = menuItem.price * item.quantity;
-      subtotal += itemTotal;
-
-      orderItems.push({
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        unitPrice: menuItem.price,
-        total: itemTotal,
-        modifiers: item.modifiers || null,
-        notes: item.notes || null,
-      });
     }
 
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: restaurantId },
-      select: { taxRate: true, serviceCharge: true },
-    });
-
-    const tax = subtotal * (restaurant!.taxRate / 100);
-    const serviceCharge = subtotal * (restaurant!.serviceCharge / 100);
-    const total = subtotal + tax + serviceCharge;
-
-    const order = await prisma.order.create({
-      data: {
-        restaurantId,
-        tableId,
-        userId,
-        orderNumber,
-        status: OrderStatus.PENDING,
-        subtotal,
-        tax,
-        serviceCharge,
-        total,
-        guestCount: guestCount || 1,
-        notes,
-        paymentStatus: PaymentStatus.PENDING,
-        items: {
-          create: orderItems,
-        },
-      },
-      include: {
-        items: {
-          include: {
-            menuItem: true,
-          },
-        },
-        table: true,
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-    });
-
-    if (tableId) {
-      await prisma.table.update({
-        where: { id: tableId },
-        data: { status: "OCCUPIED" },
-      });
+    if (!order) {
+      throw new AppError("Failed to create order", 500);
     }
 
     getIO().to(`restaurant:${restaurantId}`).emit("order:created", order);
-
-    deductStockForOrder(
-      restaurantId,
-      items.map((item: { menuItemId: string; quantity: number }) => ({
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-      })),
-      userId,
-      orderNumber,
-    ).catch((err) => {
-      console.error("Stock deduction failed for order", orderNumber, err);
-    });
 
     res.status(201).json(order);
   } catch (error) {
@@ -348,81 +392,85 @@ export const addItemsToOrder = async (
       );
     }
 
-    let additionalSubtotal = 0;
-    const newItems = [];
+    const updatedOrder = await prisma.$transaction(
+      async (tx) => {
+        let additionalSubtotal = 0;
+        const newItems = [];
 
-    for (const item of items) {
-      const menuItem = await prisma.menuItem.findUnique({
-        where: { id: item.menuItemId },
-      });
+        for (const item of items) {
+          const menuItem = await tx.menuItem.findUnique({
+            where: { id: item.menuItemId },
+          });
 
-      if (!menuItem || !menuItem.isAvailable) {
-        throw new AppError(
-          `Menu item ${item.menuItemId} is not available`,
-          400,
+          if (!menuItem || !menuItem.isAvailable) {
+            throw new AppError(
+              `Menu item ${item.menuItemId} is not available`,
+              400,
+            );
+          }
+
+          const itemTotal = menuItem.price * item.quantity;
+          additionalSubtotal += itemTotal;
+
+          newItems.push({
+            orderId: order.id,
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+            unitPrice: menuItem.price,
+            total: itemTotal,
+            modifiers: item.modifiers || null,
+            notes: item.notes || null,
+          });
+        }
+
+        const restaurant = await tx.restaurant.findUnique({
+          where: { id: restaurantId },
+          select: { taxRate: true, serviceCharge: true },
+        });
+
+        if (!restaurant) {
+          throw new AppError("Restaurant not found", 404);
+        }
+
+        const newSubtotal = order.subtotal + additionalSubtotal;
+        const newTax = newSubtotal * (restaurant.taxRate / 100);
+        const newServiceCharge = newSubtotal * (restaurant.serviceCharge / 100);
+        const newTotal = newSubtotal + newTax + newServiceCharge - order.discount;
+
+        await tx.orderItem.createMany({ data: newItems });
+
+        await deductStockForOrder(
+          restaurantId,
+          items.map((item: { menuItemId: string; quantity: number }) => ({
+            menuItemId: item.menuItemId,
+            quantity: item.quantity,
+          })),
+          userId,
+          order.orderNumber,
+          tx,
         );
-      }
 
-      const itemTotal = menuItem.price * item.quantity;
-      additionalSubtotal += itemTotal;
-
-      newItems.push({
-        orderId: order.id,
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        unitPrice: menuItem.price,
-        total: itemTotal,
-        modifiers: item.modifiers || null,
-        notes: item.notes || null,
-      });
-    }
-
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: restaurantId },
-      select: { taxRate: true, serviceCharge: true },
-    });
-
-    const newSubtotal = order.subtotal + additionalSubtotal;
-    const newTax = newSubtotal * (restaurant!.taxRate / 100);
-    const newServiceCharge = newSubtotal * (restaurant!.serviceCharge / 100);
-    const newTotal = newSubtotal + newTax + newServiceCharge - order.discount;
-
-    await prisma.orderItem.createMany({ data: newItems });
-
-    const updatedOrder = await prisma.order.update({
-      where: { id },
-      data: {
-        subtotal: newSubtotal,
-        tax: newTax,
-        serviceCharge: newServiceCharge,
-        total: newTotal,
+        return tx.order.update({
+          where: { id },
+          data: {
+            subtotal: newSubtotal,
+            tax: newTax,
+            serviceCharge: newServiceCharge,
+            total: newTotal,
+          },
+          include: {
+            items: {
+              include: { menuItem: true },
+            },
+            table: true,
+            user: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+          },
+        });
       },
-      include: {
-        items: {
-          include: { menuItem: true },
-        },
-        table: true,
-        user: {
-          select: { id: true, firstName: true, lastName: true },
-        },
-      },
-    });
-
-    deductStockForOrder(
-      restaurantId,
-      items.map((item: { menuItemId: string; quantity: number }) => ({
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-      })),
-      userId,
-      order.orderNumber,
-    ).catch((err) => {
-      console.error(
-        "Stock deduction failed for added items",
-        order.orderNumber,
-        err,
-      );
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     getIO()
       .to(`restaurant:${restaurantId}`)
@@ -457,41 +505,43 @@ export const cancelOrder = async (
       throw new AppError("Cannot cancel completed order", 400);
     }
 
-    const updatedOrder = await prisma.order.update({
-      where: { id },
-      data: { status: OrderStatus.CANCELLED },
-    });
-
-    if (order.tableId) {
-      const activeOrders = await prisma.order.count({
-        where: {
-          tableId: order.tableId,
-          status: {
-            notIn: [OrderStatus.CANCELLED, OrderStatus.PAID],
-          },
-        },
-      });
-
-      if (activeOrders === 0) {
-        await prisma.table.update({
-          where: { id: order.tableId },
-          data: { status: "AVAILABLE" },
+    const updatedOrder = await prisma.$transaction(
+      async (tx) => {
+        const cancelledOrder = await tx.order.update({
+          where: { id },
+          data: { status: OrderStatus.CANCELLED },
         });
-      }
-    }
 
-    restoreStockForOrder(
-      restaurantId,
-      id,
-      req.user!.id,
-      order.orderNumber,
-    ).catch((err) => {
-      console.error(
-        "Stock restoration failed for order",
-        order.orderNumber,
-        err,
-      );
-    });
+        if (order.tableId) {
+          const activeOrders = await tx.order.count({
+            where: {
+              tableId: order.tableId,
+              status: {
+                notIn: [OrderStatus.CANCELLED, OrderStatus.PAID],
+              },
+            },
+          });
+
+          if (activeOrders === 0) {
+            await tx.table.update({
+              where: { id: order.tableId },
+              data: { status: "AVAILABLE" },
+            });
+          }
+        }
+
+        await restoreStockForOrder(
+          restaurantId,
+          id,
+          req.user!.id,
+          order.orderNumber,
+          tx,
+        );
+
+        return cancelledOrder;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     getIO()
       .to(`restaurant:${restaurantId}`)

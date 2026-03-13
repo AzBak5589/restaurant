@@ -12,12 +12,16 @@ export const validate = (schema: ZodSchema) => {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
+        const details = error.errors.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+        }));
+
         res.status(400).json({
+          message: "Validation error",
           error: 'Validation error',
-          details: error.errors.map((err) => ({
-            path: err.path.join('.'),
-            message: err.message,
-          })),
+          code: "VALIDATION_ERROR",
+          details,
         });
         return;
       }

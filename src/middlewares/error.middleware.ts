@@ -28,16 +28,20 @@ export const errorHandler = (
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
+      message: err.message,
       error: err.message,
+      code: "APP_ERROR",
       ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
     });
     return;
   }
 
   res.status(500).json({
+    message: "Internal server error",
     error: "Internal server error",
+    code: "INTERNAL_ERROR",
     ...(process.env.NODE_ENV === "development" && {
-      message: err.message,
+      originalMessage: err.message,
       stack: err.stack,
     }),
   });
@@ -48,5 +52,9 @@ export const notFoundHandler = (
   res: Response,
   _next: NextFunction,
 ): void => {
-  res.status(404).json({ error: "Route not found" });
+  res.status(404).json({
+    message: "Route not found",
+    error: "Route not found",
+    code: "NOT_FOUND",
+  });
 };
