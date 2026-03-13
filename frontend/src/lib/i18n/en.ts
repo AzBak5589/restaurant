@@ -57,6 +57,7 @@ const en = {
   "nav.customers": "Customers",
   "nav.qrCodes": "QR Codes",
   "nav.activity": "Activity Log",
+  "nav.expenses": "Expenses",
   "nav.settings": "Settings",
   "nav.superAdmin": "Super Admin",
 

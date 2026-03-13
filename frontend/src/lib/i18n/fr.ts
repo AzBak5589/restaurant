@@ -57,6 +57,7 @@ const fr = {
   "nav.customers": "Clients",
   "nav.qrCodes": "QR Codes",
   "nav.activity": "Journal d'activité",
+  "nav.expenses": "Dépenses",
   "nav.settings": "Paramètres",
   "nav.superAdmin": "Super Admin",
 

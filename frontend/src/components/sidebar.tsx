@@ -23,6 +23,7 @@ import {
   Settings,
   BookOpen,
   Activity,
+  Wallet,
   Shield,
   Building2,
   ScrollText,
@@ -156,6 +157,12 @@ const navItems = [
     href: "/activity",
     labelKey: "nav.activity" as TranslationKey,
     icon: Activity,
+    roles: MANAGEMENT,
+  },
+  {
+    href: "/expenses",
+    labelKey: "nav.expenses" as TranslationKey,
+    icon: Wallet,
     roles: MANAGEMENT,
   },
   {
