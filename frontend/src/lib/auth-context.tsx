@@ -7,6 +7,7 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import api from "./api";
 
@@ -27,29 +28,68 @@ interface AuthContextType {
     password: string,
     restaurantId?: string,
   ) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export const buildLoginBody = (
+  email: string,
+  password: string,
+  restaurantId?: string,
+): Record<string, string> => {
+  const body: Record<string, string> = { email, password };
+  if (restaurantId) {
+    body.restaurantId = restaurantId;
+  }
+  return body;
+};
+
+export const hasSessionToken = (token: string | undefined): boolean => {
+  return Boolean(token);
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() =>
+    hasSessionToken(Cookies.get("accessToken")),
+  );
+  const router = useRouter();
+
+  const clearSession = () => {
+    Cookies.remove("accessToken");
+    Cookies.remove("refreshToken");
+    setUser(null);
+  };
 
   useEffect(() => {
     const token = Cookies.get("accessToken");
-    if (token) {
-      api
-        .get("/auth/profile")
-        .then((res) => setUser(res.data))
-        .catch(() => {
-          Cookies.remove("accessToken");
-          Cookies.remove("refreshToken");
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
+    if (!token) {
+      return;
     }
+
+    let cancelled = false;
+    api
+      .get("/auth/profile")
+      .then((res) => {
+        if (!cancelled) {
+          setUser(res.data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          clearSession();
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = async (
@@ -57,8 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     restaurantId?: string,
   ): Promise<User> => {
-    const body: Record<string, string> = { email, password };
-    if (restaurantId) body.restaurantId = restaurantId;
+    const body = buildLoginBody(email, password, restaurantId);
     const res = await api.post("/auth/login", body);
     Cookies.set("accessToken", res.data.accessToken, { expires: 7 });
     Cookies.set("refreshToken", res.data.refreshToken, { expires: 30 });
@@ -66,11 +105,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.data.user;
   };
 
-  const logout = () => {
-    Cookies.remove("accessToken");
-    Cookies.remove("refreshToken");
-    setUser(null);
-    window.location.href = "/login";
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Keep UX stable even if network/logout endpoint fails.
+    } finally {
+      clearSession();
+      router.replace("/login");
+    }
   };
 
   return (

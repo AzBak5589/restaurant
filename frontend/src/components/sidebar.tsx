@@ -24,6 +24,7 @@ import {
   BookOpen,
   Activity,
   Wallet,
+  TicketPercent,
   Shield,
   Building2,
   ScrollText,
@@ -163,6 +164,12 @@ const navItems = [
     href: "/expenses",
     labelKey: "nav.expenses" as TranslationKey,
     icon: Wallet,
+    roles: MANAGEMENT,
+  },
+  {
+    href: "/promotions",
+    labelKey: "nav.promotions" as TranslationKey,
+    icon: TicketPercent,
     roles: MANAGEMENT,
   },
   {

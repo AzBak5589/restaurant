@@ -25,6 +25,9 @@ export const getOrdersSchema = z.object({
     status: z.nativeEnum(OrderStatus).optional(),
     date: z.string().optional(),
     tableId: z.string().uuid().optional(),
+    sort: z
+      .enum(["createdAt_desc", "createdAt_asc", "total_desc", "total_asc"])
+      .optional(),
   }),
   params: z.object({}).optional(),
 });
@@ -70,6 +73,23 @@ export const addItemsToOrderSchema = z.object({
 
 export const cancelOrderSchema = z.object({
   body: z.object({}).optional(),
+  query: z.object({}).optional(),
+  params: z.object({
+    id: z.string().uuid(),
+  }),
+});
+
+export const applyPromotionSchema = z.object({
+  body: z.object({
+    promotionId: z.string().uuid().nullable().optional(),
+    promotionCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9_-]{3,30}$/)
+      .nullable()
+      .optional(),
+  }),
   query: z.object({}).optional(),
   params: z.object({
     id: z.string().uuid(),

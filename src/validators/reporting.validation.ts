@@ -42,3 +42,13 @@ export const tableTurnoverSchema = z.object({
     endDate: z.string().optional(),
   }),
 });
+
+export const promotionPerformanceSchema = z.object({
+  body: z.object({}).optional(),
+  params: z.object({}).optional(),
+  query: z.object({
+    period: periodEnum.optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+  }),
+});

@@ -7,9 +7,18 @@ export const getExpenses = async (
   res: Response,
 ): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { category, startDate, endDate } = req.query;
+  const { category, startDate, endDate, sort } = req.query;
 
   const where: any = { restaurantId };
+  const sortValue =
+    (sort as "date_desc" | "date_asc" | "amount_desc" | "amount_asc" | undefined) ??
+    "date_desc";
+  const orderByMap = {
+    date_desc: { date: "desc" },
+    date_asc: { date: "asc" },
+    amount_desc: { amount: "desc" },
+    amount_asc: { amount: "asc" },
+  } as const;
 
   if (category) {
     where.category = category;
@@ -28,7 +37,7 @@ export const getExpenses = async (
         select: { id: true, firstName: true, lastName: true },
       },
     },
-    orderBy: { date: "desc" },
+    orderBy: orderByMap[sortValue],
   });
 
   res.json(expenses);

@@ -124,6 +124,7 @@ model User {
   role         UserRole
   avatar       String?
   isActive     Boolean  @default(true)
+  refreshTokenVersion Int @default(0)
   lastLogin    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -216,6 +217,8 @@ model Order {
   tax          Float         @default(0)
   serviceCharge Float        @default(0)
   discount     Float         @default(0)
+  appliedPromotionId String?
+  appliedPromotionCode String?
   total        Float
   paymentStatus PaymentStatus @default(PENDING)
   paymentMethod PaymentMethod?
@@ -229,12 +232,14 @@ model Order {
   table      Table?      @relation(fields: [tableId], references: [id])
   user       User        @relation(fields: [userId], references: [id])
   customer   Customer?   @relation(fields: [customerId], references: [id])
+  appliedPromotion Promotion? @relation("OrderAppliedPromotion", fields: [appliedPromotionId], references: [id], onDelete: SetNull)
   items      OrderItem[]
   payments   Payment[]
 
   @@unique([restaurantId, orderNumber])
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt])
+  @@index([restaurantId, appliedPromotionCode])
 }
 
 model OrderItem {
@@ -499,6 +504,7 @@ model LoyaltyTransaction {
 model Promotion {
   id           String   @id @default(uuid())
   restaurantId String
+  code         String?
   name         String
   description  String?
   discountType String
@@ -511,8 +517,10 @@ model Promotion {
   updatedAt    DateTime @updatedAt
 
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  appliedOrders Order[] @relation("OrderAppliedPromotion")
 
   @@index([restaurantId, isActive])
+  @@unique([restaurantId, code])
 }
 
 model Expense {

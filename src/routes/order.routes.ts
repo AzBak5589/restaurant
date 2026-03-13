@@ -7,6 +7,7 @@ import {
   updateOrderItemStatus,
   addItemsToOrder,
   cancelOrder,
+  applyPromotionToOrder,
 } from "../controllers/order.controller";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
 import { validateTenant } from "../middlewares/tenant.middleware";
@@ -19,6 +20,7 @@ import {
   getOrdersSchema,
   updateOrderItemStatusSchema,
   updateOrderStatusSchema,
+  applyPromotionSchema,
 } from "../validators/order.validation";
 
 const router = Router();
@@ -51,6 +53,12 @@ router.post(
   authorize("ADMIN", "MANAGER", "WAITER"),
   validate(addItemsToOrderSchema),
   addItemsToOrder,
+);
+router.patch(
+  "/:id/promotion",
+  authorize("ADMIN", "MANAGER", "WAITER", "CASHIER"),
+  validate(applyPromotionSchema),
+  applyPromotionToOrder,
 );
 router.delete(
   "/:id",

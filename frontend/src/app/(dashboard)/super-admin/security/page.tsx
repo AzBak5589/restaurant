@@ -61,14 +61,14 @@ export default function SecurityPage() {
       const res = await api.get('/super-admin/security');
       setData(res.data);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Failed to load security data'));
+      toast.error(getApiErrorMessage(error, t('superAdmin.error.loadSecurity')));
     } finally {
       setLoading(false);
     }
   };
 
   if (user?.role !== 'SUPER_ADMIN') {
-    return <div className="flex h-64 items-center justify-center"><p className="text-lg text-destructive font-semibold">Access denied</p></div>;
+    return <div className="flex h-64 items-center justify-center"><p className="text-lg text-destructive font-semibold">{t('superAdmin.accessDenied')}</p></div>;
   }
 
   const statCards = data ? [
@@ -122,7 +122,9 @@ export default function SecurityPage() {
               {data && data.suspendedRestaurants > 0 ? (
                 <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
                   <AlertTriangle className="h-5 w-5 text-amber-500" />
-                  <p className="text-sm">{data.suspendedRestaurants} restaurant(s) suspended</p>
+                  <p className="text-sm">
+                    {data.suspendedRestaurants} {t('superAdmin.security.suspendedRestaurants')}
+                  </p>
                 </div>
               ) : (
                 <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
@@ -167,7 +169,7 @@ export default function SecurityPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <div className="py-8 text-center text-muted-foreground">No recent logins today</div>
+                <div className="py-8 text-center text-muted-foreground">{t('superAdmin.noRecentLogins')}</div>
               )}
             </CardContent>
           </Card>

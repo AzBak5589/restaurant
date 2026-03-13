@@ -25,6 +25,7 @@ import { Plus, RefreshCw, Clock, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 interface OrderItem {
   id: string;
@@ -85,11 +86,34 @@ const paymentColors: Record<string, string> = {
   REFUNDED: "bg-red-500/10 text-red-600",
 };
 
+const allowedStatusFilters = [
+  "all",
+  "PENDING",
+  "CONFIRMED",
+  "PREPARING",
+  "READY",
+  "SERVED",
+  "PAID",
+  "CANCELLED",
+] as const;
+
+const normalizeStatusFilter = (value: string | null): string => {
+  if (value && allowedStatusFilters.includes(value as (typeof allowedStatusFilters)[number])) {
+    return value;
+  }
+  return "all";
+};
+
 export default function OrdersPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>(() => {
+    return normalizeStatusFilter(searchParams.get("status"));
+  });
+  const [search, setSearch] = useState(() => searchParams.get("q") || "");
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [tables, setTables] = useState<TableOption[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemOption[]>([]);
@@ -102,6 +126,30 @@ export default function OrdersPage() {
   const [activeTableOrder, setActiveTableOrder] =
     useState<ActiveTableOrder | null>(null);
   const { t } = useI18n();
+
+  const syncFiltersToUrl = useCallback(
+    (nextStatus: string, nextSearch: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (nextStatus === "all") {
+        params.delete("status");
+      } else {
+        params.set("status", nextStatus);
+      }
+
+      if (!nextSearch) {
+        params.delete("q");
+      } else {
+        params.set("q", nextSearch);
+      }
+
+      const query = params.toString();
+      const currentQuery = searchParams.toString();
+      if (query !== currentQuery) {
+        router.replace(query ? `${pathname}?${query}` : pathname);
+      }
+    },
+    [pathname, router, searchParams],
+  );
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -120,6 +168,23 @@ export default function OrdersPage() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    syncFiltersToUrl(statusFilter, search.trim());
+  }, [search, statusFilter, syncFiltersToUrl]);
+
+  useEffect(() => {
+    const nextStatus = normalizeStatusFilter(searchParams.get("status"));
+    const nextSearch = searchParams.get("q") || "";
+
+    if (nextStatus !== statusFilter) {
+      setStatusFilter(nextStatus);
+    }
+
+    if (nextSearch !== search) {
+      setSearch(nextSearch);
+    }
+  }, [searchParams, search, statusFilter]);
 
   useEffect(() => {
     if (newOrderOpen) {
@@ -213,14 +278,13 @@ export default function OrdersPage() {
   };
 
   const cancelOrder = async (order: Order) => {
-    if (!confirm(`Cancel order ${order.orderNumber}? Stock will be restored.`))
-      return;
+    if (!confirm(`${t("orders.confirm.cancel")} ${order.orderNumber}?`)) return;
     try {
       await api.delete(`/orders/${order.id}`);
-      toast.success(`${order.orderNumber} cancelled`);
+      toast.success(`${order.orderNumber} ${t("orders.toast.cancelled")}`);
       fetchOrders();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to cancel order"));
+      toast.error(getApiErrorMessage(error, t("orders.error.cancel")));
     }
   };
 
@@ -324,7 +388,7 @@ export default function OrdersPage() {
                               }
                             >
                               {mi.name} - {mi.price.toLocaleString()} FCFA
-                              {!mi.isAvailable ? " (Indisponible)" : ""}
+                              {!mi.isAvailable ? ` (${t("menu.unavailable")})` : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>

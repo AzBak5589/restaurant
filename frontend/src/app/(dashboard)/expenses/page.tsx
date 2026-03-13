@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { useI18n } from "@/lib/i18n";
 
 interface Expense {
   id: string;
@@ -119,6 +120,7 @@ const emptyForm = {
 };
 
 export default function ExpensesPage() {
+  const { t } = useI18n();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -143,7 +145,7 @@ export default function ExpensesPage() {
       const res = await api.get("/expenses", { params });
       setExpenses(res.data);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load expenses"));
+      toast.error(getApiErrorMessage(error, t("expenses.error.load")));
     } finally {
       setLoading(false);
     }
@@ -171,7 +173,7 @@ export default function ExpensesPage() {
 
   const createExpense = async () => {
     if (!form.description.trim() || !form.amount) {
-      toast.error("Description and amount are required");
+      toast.error(t("expenses.error.requiredFields"));
       return;
     }
     setCreating(true);
@@ -180,13 +182,13 @@ export default function ExpensesPage() {
         ...form,
         amount: parseFloat(form.amount),
       });
-      toast.success("Expense added");
+      toast.success(t("expenses.toast.created"));
       setCreateOpen(false);
       setForm({ ...emptyForm });
       fetchExpenses();
       fetchSummary();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create expense"));
+      toast.error(getApiErrorMessage(error, t("expenses.error.create")));
     } finally {
       setCreating(false);
     }
@@ -209,7 +211,7 @@ export default function ExpensesPage() {
 
   const saveEdit = async () => {
     if (!editForm.description.trim() || !editForm.amount) {
-      toast.error("Description and amount are required");
+      toast.error(t("expenses.error.requiredFields"));
       return;
     }
     setSaving(true);
@@ -222,26 +224,26 @@ export default function ExpensesPage() {
         paymentMethod: editForm.paymentMethod || null,
         notes: editForm.notes || null,
       });
-      toast.success("Expense updated");
+      toast.success(t("expenses.toast.updated"));
       setEditOpen(false);
       fetchExpenses();
       fetchSummary();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to update expense"));
+      toast.error(getApiErrorMessage(error, t("expenses.error.update")));
     } finally {
       setSaving(false);
     }
   };
 
   const deleteExpense = async (e: Expense) => {
-    if (!confirm(`Delete expense "${e.description}"?`)) return;
+    if (!confirm(`${t("expenses.confirm.delete")} "${e.description}"?`)) return;
     try {
       await api.delete(`/expenses/${e.id}`);
-      toast.success("Expense deleted");
+      toast.success(t("expenses.toast.deleted"));
       fetchExpenses();
       fetchSummary();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to delete expense"));
+      toast.error(getApiErrorMessage(error, t("expenses.error.delete")));
     }
   };
 
@@ -252,7 +254,7 @@ export default function ExpensesPage() {
     <>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>Category *</Label>
+          <Label>{t("menu.category")} *</Label>
           <Select
             value={f.category}
             onValueChange={(v) => setF({ ...f, category: v })}
@@ -270,7 +272,7 @@ export default function ExpensesPage() {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label>Date *</Label>
+          <Label>{t("common.date")} *</Label>
           <Input
             type="date"
             value={f.date}
@@ -279,16 +281,16 @@ export default function ExpensesPage() {
         </div>
       </div>
       <div className="space-y-2">
-        <Label>Description *</Label>
+        <Label>{t("expenses.description")} *</Label>
         <Input
           value={f.description}
           onChange={(e) => setF({ ...f, description: e.target.value })}
-          placeholder="What was this expense for?"
+          placeholder={t("expenses.descriptionPlaceholder")}
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>Amount (FCFA) *</Label>
+          <Label>{t("payments.amount")} (FCFA) *</Label>
           <Input
             type="number"
             min="0"
@@ -298,7 +300,7 @@ export default function ExpensesPage() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Payment Method</Label>
+          <Label>{t("payments.method")}</Label>
           <Select
             value={f.paymentMethod || "none"}
             onValueChange={(v) =>
@@ -306,7 +308,7 @@ export default function ExpensesPage() {
             }
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select..." />
+              <SelectValue placeholder={t("expenses.selectPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">—</SelectItem>
@@ -321,14 +323,14 @@ export default function ExpensesPage() {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>Supplier</Label>
+          <Label>{t("inventory.supplier")}</Label>
           <Input
             value={f.supplier}
             onChange={(e) => setF({ ...f, supplier: e.target.value })}
           />
         </div>
         <div className="space-y-2">
-          <Label>Reference / Invoice #</Label>
+          <Label>{t("expenses.reference")}</Label>
           <Input
             value={f.reference}
             onChange={(e) => setF({ ...f, reference: e.target.value })}
@@ -336,11 +338,11 @@ export default function ExpensesPage() {
         </div>
       </div>
       <div className="space-y-2">
-        <Label>Notes</Label>
+        <Label>{t("common.notes")}</Label>
         <Input
           value={f.notes}
           onChange={(e) => setF({ ...f, notes: e.target.value })}
-          placeholder="Optional notes..."
+          placeholder={t("expenses.notesPlaceholder")}
         />
       </div>
     </>
@@ -352,9 +354,9 @@ export default function ExpensesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Expenses</h1>
+          <h1 className="text-2xl font-bold">{t("nav.expenses")}</h1>
           <p className="text-muted-foreground">
-            {expenses.length} expenses recorded
+            {expenses.length} {t("expenses.recorded")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -366,17 +368,17 @@ export default function ExpensesPage() {
               fetchSummary();
             }}
           >
-            <RefreshCw className="mr-1 h-4 w-4" /> Refresh
+            <RefreshCw className="mr-1 h-4 w-4" /> {t("common.refresh")}
           </Button>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
-                <Plus className="mr-1 h-4 w-4" /> Add Expense
+                <Plus className="mr-1 h-4 w-4" /> {t("expenses.addExpense")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add Expense</DialogTitle>
+                <DialogTitle>{t("expenses.addExpense")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 {renderFormFields(form, setForm)}
@@ -385,7 +387,7 @@ export default function ExpensesPage() {
                   onClick={createExpense}
                   disabled={creating}
                 >
-                  {creating ? "Adding..." : "Add Expense"}
+                  {creating ? t("expenses.adding") : t("expenses.addExpense")}
                 </Button>
               </div>
             </DialogContent>
@@ -399,13 +401,13 @@ export default function ExpensesPage() {
           <DialogHeader>
             <DialogTitle>
               <Pencil className="mr-2 inline h-4 w-4" />
-              Edit Expense
+              {t("expenses.editExpense")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {renderFormFields(editForm, setEditForm)}
             <Button className="w-full" onClick={saveEdit} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("common.saving") : t("customers.saveChanges")}
             </Button>
           </div>
         </DialogContent>
@@ -421,7 +423,7 @@ export default function ExpensesPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Revenue ({monthName})
+                  {t("reports.revenue")} ({monthName})
                 </p>
                 <p className="text-lg font-bold">
                   {summary.totalRevenue.toLocaleString()} FCFA
@@ -436,7 +438,7 @@ export default function ExpensesPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Expenses ({monthName})
+                  {t("reports.expenses")} ({monthName})
                 </p>
                 <p className="text-lg font-bold">
                   {summary.totalExpenses.toLocaleString()} FCFA
@@ -455,7 +457,7 @@ export default function ExpensesPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Net Profit ({monthName})
+                  {t("reports.profit")} ({monthName})
                 </p>
                 <p
                   className={`text-lg font-bold ${summary.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}
@@ -471,7 +473,7 @@ export default function ExpensesPage() {
                 <Receipt className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Transactions</p>
+                <p className="text-sm text-muted-foreground">{t("expenses.transactions")}</p>
                 <p className="text-lg font-bold">
                   {summary.orderCount} orders / {summary.expenseCount} expenses
                 </p>
@@ -486,7 +488,7 @@ export default function ExpensesPage() {
         <Card>
           <CardContent className="p-4">
             <p className="mb-3 text-sm font-medium text-muted-foreground">
-              Expenses by Category ({monthName})
+              {t("expenses.byCategory")} ({monthName})
             </p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(summary.byCategory)
@@ -509,10 +511,10 @@ export default function ExpensesPage() {
       <div className="flex gap-3">
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Filter by category" />
+            <SelectValue placeholder={t("expenses.filterByCategory")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="all">{t("expenses.allCategories")}</SelectItem>
             {CATEGORIES.map((c) => (
               <SelectItem key={c} value={c}>
                 {c}
@@ -531,7 +533,7 @@ export default function ExpensesPage() {
         <Card>
           <CardContent className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
             <Wallet className="h-8 w-8" />
-            No expenses recorded
+            {t("expenses.noExpenses")}
           </CardContent>
         </Card>
       ) : (
@@ -539,12 +541,12 @@ export default function ExpensesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>{t("common.date")}</TableHead>
+                <TableHead>{t("menu.category")}</TableHead>
+                <TableHead>{t("expenses.description")}</TableHead>
+                <TableHead>{t("inventory.supplier")}</TableHead>
+                <TableHead>{t("payments.method")}</TableHead>
+                <TableHead className="text-right">{t("payments.amount")}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -585,14 +587,14 @@ export default function ExpensesPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(e)}>
-                          <Pencil className="mr-2 h-4 w-4" /> Edit
+                          <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
                           onClick={() => deleteExpense(e)}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

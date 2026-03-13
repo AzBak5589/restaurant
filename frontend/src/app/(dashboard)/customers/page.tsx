@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { useI18n } from "@/lib/i18n";
 
 interface Customer {
   id: string;
@@ -59,6 +60,7 @@ interface Customer {
 const emptyForm = { firstName: "", lastName: "", phone: "", email: "" };
 
 export default function CustomersPage() {
+  const { t } = useI18n();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -80,7 +82,7 @@ export default function CustomersPage() {
       const res = await api.get("/customers", { params });
       setCustomers(res.data);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load customers"));
+      toast.error(getApiErrorMessage(error, t("customers.error.load")));
     } finally {
       setLoading(false);
     }
@@ -92,7 +94,7 @@ export default function CustomersPage() {
 
   const createCustomer = async () => {
     if (!form.firstName.trim() || !form.phone.trim()) {
-      toast.error("Name and phone are required");
+      toast.error(t("customers.error.requiredNamePhone"));
       return;
     }
     setCreating(true);
@@ -103,12 +105,12 @@ export default function CustomersPage() {
         phone: form.phone,
         email: form.email || undefined,
       });
-      toast.success("Customer created");
+      toast.success(t("customers.toast.created"));
       setCreateOpen(false);
       setForm({ ...emptyForm });
       fetchCustomers();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create customer"));
+      toast.error(getApiErrorMessage(error, t("customers.error.create")));
     } finally {
       setCreating(false);
     }
@@ -127,7 +129,7 @@ export default function CustomersPage() {
 
   const saveEdit = async () => {
     if (!editForm.firstName.trim() || !editForm.phone.trim()) {
-      toast.error("Name and phone are required");
+      toast.error(t("customers.error.requiredNamePhone"));
       return;
     }
     setSaving(true);
@@ -138,11 +140,11 @@ export default function CustomersPage() {
         phone: editForm.phone,
         email: editForm.email || null,
       });
-      toast.success("Customer updated");
+      toast.success(t("customers.toast.updated"));
       setEditOpen(false);
       fetchCustomers();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to update customer"));
+      toast.error(getApiErrorMessage(error, t("customers.error.update")));
     } finally {
       setSaving(false);
     }
@@ -151,21 +153,30 @@ export default function CustomersPage() {
   const toggleActive = async (c: Customer) => {
     try {
       await api.patch(`/customers/${c.id}`, { isActive: !c.isActive });
-      toast.success(c.isActive ? "Customer deactivated" : "Customer activated");
+      toast.success(
+        c.isActive
+          ? t("customers.toast.deactivated")
+          : t("customers.toast.activated"),
+      );
       fetchCustomers();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to update customer"));
+      toast.error(getApiErrorMessage(error, t("customers.error.update")));
     }
   };
 
   const deleteCustomer = async (c: Customer) => {
-    if (!confirm(`Delete "${c.firstName} ${c.lastName}"?`)) return;
+    if (
+      !confirm(
+        `${t("customers.confirm.deactivate")} "${c.firstName} ${c.lastName}"?`,
+      )
+    )
+      return;
     try {
       await api.patch(`/customers/${c.id}`, { isActive: false });
-      toast.success("Customer deactivated");
+      toast.success(t("customers.toast.deactivated"));
       fetchCustomers();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to delete customer"));
+      toast.error(getApiErrorMessage(error, t("customers.error.delete")));
     }
   };
 
@@ -181,14 +192,14 @@ export default function CustomersPage() {
     <>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>First Name *</Label>
+          <Label>{t("staff.firstName")} *</Label>
           <Input
             value={f.firstName}
             onChange={(e) => setF({ ...f, firstName: e.target.value })}
           />
         </div>
         <div className="space-y-2">
-          <Label>Last Name</Label>
+          <Label>{t("staff.lastName")}</Label>
           <Input
             value={f.lastName}
             onChange={(e) => setF({ ...f, lastName: e.target.value })}
@@ -196,14 +207,14 @@ export default function CustomersPage() {
         </div>
       </div>
       <div className="space-y-2">
-        <Label>Phone *</Label>
+        <Label>{t("common.phone")} *</Label>
         <Input
           value={f.phone}
           onChange={(e) => setF({ ...f, phone: e.target.value })}
         />
       </div>
       <div className="space-y-2">
-        <Label>Email</Label>
+        <Label>{t("common.email")}</Label>
         <Input
           type="email"
           value={f.email}
@@ -217,22 +228,24 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Customers</h1>
-          <p className="text-muted-foreground">{customers.length} customers</p>
+          <h1 className="text-2xl font-bold">{t("customers.title")}</h1>
+          <p className="text-muted-foreground">
+            {customers.length} {t("customers.totalCustomers")}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchCustomers}>
-            <RefreshCw className="mr-1 h-4 w-4" /> Refresh
+            <RefreshCw className="mr-1 h-4 w-4" /> {t("common.refresh")}
           </Button>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
-                <Plus className="mr-1 h-4 w-4" /> Add Customer
+                <Plus className="mr-1 h-4 w-4" /> {t("customers.addCustomer")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add Customer</DialogTitle>
+                <DialogTitle>{t("customers.addCustomer")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 {renderFormFields(form, setForm)}
@@ -241,7 +254,7 @@ export default function CustomersPage() {
                   onClick={createCustomer}
                   disabled={creating}
                 >
-                  {creating ? "Creating..." : "Add Customer"}
+                  {creating ? t("common.creating") : t("customers.addCustomer")}
                 </Button>
               </div>
             </DialogContent>
@@ -255,13 +268,13 @@ export default function CustomersPage() {
           <DialogHeader>
             <DialogTitle>
               <Pencil className="mr-2 inline h-4 w-4" />
-              Edit Customer
+              {t("customers.editCustomer")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {renderFormFields(editForm, setEditForm)}
             <Button className="w-full" onClick={saveEdit} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("common.saving") : t("customers.saveChanges")}
             </Button>
           </div>
         </DialogContent>
@@ -271,14 +284,14 @@ export default function CustomersPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by name, phone, or email..."
+            placeholder={t("customers.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
         <Button type="submit" variant="outline">
-          Search
+          {t("common.search")}
         </Button>
       </form>
 
@@ -290,7 +303,7 @@ export default function CustomersPage() {
         <Card>
           <CardContent className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
             <Heart className="h-8 w-8" />
-            No customers found
+            {t("customers.noCustomers")}
           </CardContent>
         </Card>
       ) : (
@@ -298,13 +311,13 @@ export default function CustomersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="text-right">Visits</TableHead>
-                <TableHead className="text-right">Total Spent</TableHead>
-                <TableHead className="text-right">Loyalty Points</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("common.phone")}</TableHead>
+                <TableHead>{t("common.email")}</TableHead>
+                <TableHead className="text-right">{t("customers.visitCount")}</TableHead>
+                <TableHead className="text-right">{t("customers.totalSpent")}</TableHead>
+                <TableHead className="text-right">{t("customers.loyaltyPoints")}</TableHead>
+                <TableHead>{t("common.status")}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -333,7 +346,7 @@ export default function CustomersPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={c.isActive ? "default" : "secondary"}>
-                      {c.isActive ? "Active" : "Inactive"}
+                      {c.isActive ? t("common.active") : t("common.inactive")}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -349,7 +362,7 @@ export default function CustomersPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(c)}>
-                          <Pencil className="mr-2 h-4 w-4" /> Edit
+                          <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => toggleActive(c)}>
                           {c.isActive ? (
@@ -357,14 +370,14 @@ export default function CustomersPage() {
                           ) : (
                             <UserCheck className="mr-2 h-4 w-4" />
                           )}
-                          {c.isActive ? "Deactivate" : "Activate"}
+                          {c.isActive ? t("customers.deactivate") : t("customers.activate")}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
                           onClick={() => deleteCustomer(c)}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

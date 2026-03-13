@@ -15,7 +15,35 @@ interface RetryableRequest {
 
 let refreshRequest: Promise<string | null> | null = null;
 
-const redirectToLogin = () => {
+export const parseRefreshTokens = (
+  payload: unknown,
+): { accessToken: string; refreshToken: string } | null => {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const accessToken =
+    typeof record.accessToken === "string" ? record.accessToken : null;
+  const refreshToken =
+    typeof record.refreshToken === "string" ? record.refreshToken : null;
+
+  if (!accessToken || !refreshToken) {
+    return null;
+  }
+
+  return { accessToken, refreshToken };
+};
+
+export const shouldTryRefresh = (
+  status: number | undefined,
+  hasOriginalRequest: boolean,
+  alreadyRetried: boolean | undefined,
+): boolean => {
+  return status === 401 && hasOriginalRequest && !alreadyRetried;
+};
+
+export const redirectToLogin = () => {
   Cookies.remove("accessToken");
   Cookies.remove("refreshToken");
   if (typeof window !== "undefined") {
@@ -23,7 +51,7 @@ const redirectToLogin = () => {
   }
 };
 
-const getFreshAccessToken = async (): Promise<string | null> => {
+export const getFreshAccessToken = async (): Promise<string | null> => {
   const refreshToken = Cookies.get("refreshToken");
   if (!refreshToken) {
     return null;
@@ -33,16 +61,14 @@ const getFreshAccessToken = async (): Promise<string | null> => {
     refreshRequest = axios
       .post(`${API_URL}/auth/refresh`, { refreshToken })
       .then((res) => {
-        const nextAccessToken = res.data?.accessToken as string | undefined;
-        const nextRefreshToken = res.data?.refreshToken as string | undefined;
-
-        if (!nextAccessToken || !nextRefreshToken) {
+        const nextTokens = parseRefreshTokens(res.data);
+        if (!nextTokens) {
           return null;
         }
 
-        Cookies.set("accessToken", nextAccessToken, { expires: 7 });
-        Cookies.set("refreshToken", nextRefreshToken, { expires: 30 });
-        return nextAccessToken;
+        Cookies.set("accessToken", nextTokens.accessToken, { expires: 7 });
+        Cookies.set("refreshToken", nextTokens.refreshToken, { expires: 30 });
+        return nextTokens.accessToken;
       })
       .catch(() => null)
       .finally(() => {
@@ -69,7 +95,7 @@ api.interceptors.response.use(
       | undefined;
     const status = error.response?.status as number | undefined;
 
-    if (status === 401 && originalRequest && !originalRequest._retry) {
+    if (shouldTryRefresh(status, Boolean(originalRequest), originalRequest?._retry)) {
       originalRequest._retry = true;
       const freshToken = await getFreshAccessToken();
 

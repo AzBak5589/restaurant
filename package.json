@@ -5,12 +5,16 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon src/server.ts",
+    "dev:safe": "npm run db:doctor && npm run dev",
     "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "db:doctor": "bash ./scripts/db-doctor.sh"
   },
   "keywords": [
     "restaurant",
@@ -44,6 +48,8 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/bcrypt": "^5.0.2",
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",
@@ -53,9 +59,11 @@
     "@types/node": "^20.10.6",
     "@types/qrcode": "^1.5.6",
     "@types/uuid": "^9.0.7",
+    "jsdom": "^22.1.0",
     "nodemon": "^3.0.2",
     "prisma": "^5.8.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.1"
   }
 }

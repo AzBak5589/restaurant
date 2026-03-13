@@ -7,6 +7,7 @@ export interface JWTPayload {
   restaurantId: string | null;
   email: string;
   role: UserRole;
+  tokenVersion?: number;
 }
 
 export const generateAccessToken = (payload: JWTPayload): string => {

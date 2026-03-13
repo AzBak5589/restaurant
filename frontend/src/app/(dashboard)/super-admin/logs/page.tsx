@@ -48,14 +48,14 @@ export default function LogsPage() {
       });
       setLogs(res.data);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Failed to load logs'));
+      toast.error(getApiErrorMessage(error, t('superAdmin.error.loadLogs')));
     } finally {
       setLoading(false);
     }
   };
 
   if (user?.role !== 'SUPER_ADMIN') {
-    return <div className="flex h-64 items-center justify-center"><p className="text-lg text-destructive font-semibold">Access denied</p></div>;
+    return <div className="flex h-64 items-center justify-center"><p className="text-lg text-destructive font-semibold">{t('superAdmin.accessDenied')}</p></div>;
   }
 
   const typeIcons: Record<string, React.ReactNode> = {
@@ -128,19 +128,19 @@ export default function LogsPage() {
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1 || loading}
         >
-          Previous
+          {t('common.back')}
         </Button>
-        <span className="text-sm text-muted-foreground">Page {page}</span>
+        <span className="text-sm text-muted-foreground">{t('superAdmin.page')} {page}</span>
         <Button
           variant="outline"
           size="sm"
           onClick={() => setPage((p) => p + 1)}
           disabled={loading || logs.length < PAGE_SIZE}
         >
-          Next
+          {t('common.next')}
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">{logs.length} entries</p>
+      <p className="text-xs text-muted-foreground">{logs.length} {t('superAdmin.entries')}</p>
     </div>
   );
 }

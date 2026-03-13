@@ -92,6 +92,27 @@ npm run prisma:generate
 npm run prisma:migrate
 ```
 
+### Database Stability Guard (recommended)
+
+If you have multiple PostgreSQL installations (Homebrew + EnterpriseDB), run:
+
+```bash
+npm run db:doctor
+```
+
+This checks:
+
+- Active PostgreSQL listener on your configured port
+- `psql` binary availability
+- Real connection using `DATABASE_URL`
+- Effective server `data_directory` to confirm you are on the expected cluster
+
+You can also start development in guarded mode:
+
+```bash
+npm run dev:safe
+```
+
 6. **Start the development server**
 
 ```bash

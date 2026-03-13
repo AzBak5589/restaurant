@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { useI18n } from "@/lib/i18n";
 
 interface MenuItem {
   id: string;
@@ -68,6 +69,7 @@ const emptyItemForm = {
 };
 
 export default function MenuPage() {
+  const { t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
@@ -93,7 +95,7 @@ export default function MenuPage() {
         setSelectedCategoryId(res.data[0].id);
       }
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load menu"));
+      toast.error(getApiErrorMessage(error, t("menu.error.load")));
     } finally {
       setLoading(false);
     }
@@ -120,38 +122,38 @@ export default function MenuPage() {
 
   const saveCategory = async () => {
     if (!catForm.name.trim()) {
-      toast.error("Name is required");
+      toast.error(t("menu.error.requiredName"));
       return;
     }
     try {
       if (catEditMode) {
         await api.patch(`/menu/categories/${editingCatId}`, catForm);
-        toast.success("Category updated");
+        toast.success(t("menu.toast.categoryUpdated"));
       } else {
         await api.post("/menu/categories", catForm);
-        toast.success("Category created");
+        toast.success(t("menu.toast.categoryCreated"));
       }
       setCatDialogOpen(false);
       fetchMenu();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to save category"));
+      toast.error(getApiErrorMessage(error, t("menu.error.saveCategory")));
     }
   };
 
   const deleteCategory = async (catId: string, catName: string) => {
     if (
       !confirm(
-        `Delete category "${catName}" and all its items? This cannot be undone.`,
+        `${t("menu.confirm.deleteCategory")} "${catName}"?`,
       )
     )
       return;
     try {
       await api.delete(`/menu/categories/${catId}`);
-      toast.success(`"${catName}" deleted`);
+      toast.success(`"${catName}" ${t("menu.toast.deleted")}`);
       if (selectedCategoryId === catId) setSelectedCategoryId("");
       fetchMenu();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to delete category"));
+      toast.error(getApiErrorMessage(error, t("menu.error.deleteCategory")));
     }
   };
 
@@ -179,7 +181,7 @@ export default function MenuPage() {
 
   const saveItem = async () => {
     if (!itemForm.name.trim() || !itemForm.price) {
-      toast.error("Name and price are required");
+      toast.error(t("menu.error.requiredNamePrice"));
       return;
     }
     const payload = {
@@ -195,36 +197,38 @@ export default function MenuPage() {
     try {
       if (itemEditMode) {
         await api.patch(`/menu/items/${editingItemId}`, payload);
-        toast.success("Item updated");
+        toast.success(t("menu.toast.itemUpdated"));
       } else {
         await api.post("/menu/items", payload);
-        toast.success("Item created");
+        toast.success(t("menu.toast.itemCreated"));
       }
       setItemDialogOpen(false);
       fetchMenu();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to save item"));
+      toast.error(getApiErrorMessage(error, t("menu.error.saveItem")));
     }
   };
 
   const deleteItem = async (itemId: string, itemName: string) => {
-    if (!confirm(`Delete "${itemName}"?`)) return;
+    if (!confirm(`${t("menu.confirm.deleteItem")} "${itemName}"?`)) return;
     try {
       await api.delete(`/menu/items/${itemId}`);
-      toast.success(`"${itemName}" deleted`);
+      toast.success(`"${itemName}" ${t("menu.toast.deleted")}`);
       fetchMenu();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to delete item"));
+      toast.error(getApiErrorMessage(error, t("menu.error.deleteItem")));
     }
   };
 
   const toggleAvailability = async (itemId: string, isAvailable: boolean) => {
     try {
       await api.patch(`/menu/items/${itemId}`, { isAvailable: !isAvailable });
-      toast.success(isAvailable ? "Marked unavailable" : "Marked available");
+      toast.success(
+        isAvailable ? t("menu.toast.markedUnavailable") : t("menu.toast.markedAvailable"),
+      );
       fetchMenu();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to update item"));
+      toast.error(getApiErrorMessage(error, t("menu.error.updateItem")));
     }
   };
 
@@ -238,24 +242,24 @@ export default function MenuPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Menu</h1>
+          <h1 className="text-2xl font-bold">{t("menu.title")}</h1>
           <p className="text-muted-foreground">
-            {categories.length} categories, {totalItems} items
+            {categories.length} {t("menu.categoriesCount")}, {totalItems} {t("menu.totalItems")}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchMenu}>
-            <RefreshCw className="mr-1 h-4 w-4" /> Refresh
+            <RefreshCw className="mr-1 h-4 w-4" /> {t("common.refresh")}
           </Button>
           <Button size="sm" variant="outline" onClick={openCreateCategory}>
-            <Plus className="mr-1 h-4 w-4" /> Category
+            <Plus className="mr-1 h-4 w-4" /> {t("menu.category")}
           </Button>
           <Button
             size="sm"
             onClick={openCreateItem}
             disabled={categories.length === 0}
           >
-            <Plus className="mr-1 h-4 w-4" /> Item
+            <Plus className="mr-1 h-4 w-4" /> {t("menu.addItem")}
           </Button>
         </div>
       </div>
@@ -265,12 +269,12 @@ export default function MenuPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {catEditMode ? "Edit Category" : "New Category"}
+              {catEditMode ? t("menu.editCategory") : t("menu.newCategory")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Name *</Label>
+              <Label>{t("common.name")} *</Label>
               <Input
                 value={catForm.name}
                 onChange={(e) =>
@@ -279,7 +283,7 @@ export default function MenuPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t("expenses.description")}</Label>
               <Input
                 value={catForm.description}
                 onChange={(e) =>
@@ -288,7 +292,7 @@ export default function MenuPage() {
               />
             </div>
             <Button className="w-full" onClick={saveCategory}>
-              {catEditMode ? "Update Category" : "Create Category"}
+              {catEditMode ? t("menu.updateCategory") : t("menu.createCategory")}
             </Button>
           </div>
         </DialogContent>
@@ -299,12 +303,12 @@ export default function MenuPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {itemEditMode ? "Edit Item" : "New Menu Item"}
+              {itemEditMode ? t("menu.editItem") : t("menu.newItem")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Name *</Label>
+              <Label>{t("common.name")} *</Label>
               <Input
                 value={itemForm.name}
                 onChange={(e) =>
@@ -313,7 +317,7 @@ export default function MenuPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t("expenses.description")}</Label>
               <Input
                 value={itemForm.description}
                 onChange={(e) =>
@@ -323,7 +327,7 @@ export default function MenuPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Price (FCFA) *</Label>
+                <Label>{t("menu.price")} (FCFA) *</Label>
                 <Input
                   type="number"
                   value={itemForm.price}
@@ -333,7 +337,7 @@ export default function MenuPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Cost (FCFA)</Label>
+                <Label>{t("menu.cost")} (FCFA)</Label>
                 <Input
                   type="number"
                   value={itemForm.cost}
@@ -344,7 +348,7 @@ export default function MenuPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Prep Time (min)</Label>
+              <Label>{t("menu.prepTime")} (min)</Label>
               <Input
                 type="number"
                 value={itemForm.preparationTime}
@@ -355,7 +359,7 @@ export default function MenuPage() {
             </div>
             {!itemEditMode && categories.length > 1 && (
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>{t("menu.category")}</Label>
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={itemForm.categoryId}
@@ -372,7 +376,7 @@ export default function MenuPage() {
               </div>
             )}
             <Button className="w-full" onClick={saveItem}>
-              {itemEditMode ? "Update Item" : "Create Item"}
+              {itemEditMode ? t("menu.updateItem") : t("menu.createItem")}
             </Button>
           </div>
         </DialogContent>
@@ -386,7 +390,7 @@ export default function MenuPage() {
       ) : categories.length === 0 ? (
         <Card>
           <CardContent className="flex h-40 items-center justify-center text-muted-foreground">
-            No menu categories yet. Create one to get started.
+            {t("menu.emptyCategories")}
           </CardContent>
         </Card>
       ) : (
@@ -446,13 +450,13 @@ export default function MenuPage() {
                 <Card>
                   <CardContent className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
                     <UtensilsCrossed className="h-8 w-8" />
-                    <p>No items in this category</p>
+                    <p>{t("menu.emptyCategoryItems")}</p>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={openCreateItem}
                     >
-                      <Plus className="mr-1 h-4 w-4" /> Add first item
+                      <Plus className="mr-1 h-4 w-4" /> {t("menu.addFirstItem")}
                     </Button>
                   </CardContent>
                 </Card>
@@ -483,7 +487,7 @@ export default function MenuPage() {
                                 variant="destructive"
                                 className="text-xs gap-1"
                               >
-                                <Ban className="h-3 w-3" /> Unavailable
+                                <Ban className="h-3 w-3" /> {t("menu.unavailable")}
                               </Badge>
                             )}
                             <DropdownMenu>
@@ -500,7 +504,7 @@ export default function MenuPage() {
                                 <DropdownMenuItem
                                   onClick={() => openEditItem(item)}
                                 >
-                                  <Pencil className="mr-2 h-4 w-4" /> Edit
+                                  <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() =>
@@ -512,13 +516,11 @@ export default function MenuPage() {
                                 >
                                   {item.isAvailable ? (
                                     <>
-                                      <EyeOff className="mr-2 h-4 w-4" /> Mark
-                                      Unavailable
+                                      <EyeOff className="mr-2 h-4 w-4" /> {t("menu.markUnavailable")}
                                     </>
                                   ) : (
                                     <>
-                                      <Eye className="mr-2 h-4 w-4" /> Mark
-                                      Available
+                                      <Eye className="mr-2 h-4 w-4" /> {t("menu.markAvailable")}
                                     </>
                                   )}
                                 </DropdownMenuItem>
@@ -527,7 +529,7 @@ export default function MenuPage() {
                                   className="text-destructive"
                                   onClick={() => deleteItem(item.id, item.name)}
                                 >
-                                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                  <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -548,7 +550,7 @@ export default function MenuPage() {
                           </span>
                           {item.cost != null && item.cost > 0 && (
                             <span className="text-sm text-muted-foreground">
-                              Cost: {item.cost.toLocaleString()} | Margin:{" "}
+                              {t("menu.cost")}: {item.cost.toLocaleString()} | {t("recipes.margin")}:{" "}
                               {Math.round(
                                 ((item.price - item.cost) / item.price) * 100,
                               )}
@@ -560,12 +562,12 @@ export default function MenuPage() {
                           {item.preparationTime != null &&
                             item.preparationTime > 0 && (
                               <Badge variant="outline" className="text-xs">
-                                {item.preparationTime} min
+                                {item.preparationTime} {t("menu.minutesShort")}
                               </Badge>
                             )}
                           {item.calories != null && item.calories > 0 && (
                             <Badge variant="outline" className="text-xs">
-                              {item.calories} cal
+                              {item.calories} {t("menu.caloriesShort")}
                             </Badge>
                           )}
                           {item.tags.map((tag) => (
@@ -580,7 +582,7 @@ export default function MenuPage() {
                         </div>
                         {item.allergens.length > 0 && (
                           <p className="text-xs text-amber-600">
-                            Allergens: {item.allergens.join(", ")}
+                            {t("menu.allergens")}: {item.allergens.join(", ")}
                           </p>
                         )}
                       </CardContent>

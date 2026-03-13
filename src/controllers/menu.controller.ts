@@ -8,10 +8,20 @@ export const getCategories = async (
 ): Promise<void> => {
   try {
     const restaurantId = req.user!.restaurantId;
+    const { sort } = req.query;
+    const sortValue =
+      (sort as "sortOrder_asc" | "sortOrder_desc" | "name_asc" | "name_desc" | undefined) ??
+      "sortOrder_asc";
+    const orderByMap = {
+      sortOrder_asc: { sortOrder: "asc" },
+      sortOrder_desc: { sortOrder: "desc" },
+      name_asc: { name: "asc" },
+      name_desc: { name: "desc" },
+    } as const;
 
     const categories = await prisma.menuCategory.findMany({
       where: { restaurantId, isActive: true },
-      orderBy: { sortOrder: "asc" },
+      orderBy: orderByMap[sortValue],
       include: {
         menuItems: {
           where: { isActive: true },
@@ -110,9 +120,26 @@ export const getMenuItems = async (
 ): Promise<void> => {
   try {
     const restaurantId = req.user!.restaurantId;
-    const { categoryId, isAvailable } = req.query;
+    const { categoryId, isAvailable, sort } = req.query;
 
     const where: any = { restaurantId, isActive: true };
+    const sortValue =
+      (sort as
+        | "name_asc"
+        | "name_desc"
+        | "price_asc"
+        | "price_desc"
+        | "preparationTime_asc"
+        | "preparationTime_desc"
+        | undefined) ?? "name_asc";
+    const orderByMap = {
+      name_asc: { name: "asc" },
+      name_desc: { name: "desc" },
+      price_asc: { price: "asc" },
+      price_desc: { price: "desc" },
+      preparationTime_asc: { preparationTime: "asc" },
+      preparationTime_desc: { preparationTime: "desc" },
+    } as const;
 
     if (categoryId) {
       where.categoryId = categoryId;
@@ -127,7 +154,7 @@ export const getMenuItems = async (
       include: {
         category: true,
       },
-      orderBy: { name: "asc" },
+      orderBy: orderByMap[sortValue],
     });
 
     res.json(menuItems);

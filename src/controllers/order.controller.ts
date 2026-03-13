@@ -1,181 +1,54 @@
 import { Request, Response } from "express";
 import prisma from "../config/database";
 import { AppError } from "../middlewares/error.middleware";
-import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 import { getIO } from "../config/socket";
+import { restoreStockForOrder } from "../services/inventory.service";
 import {
-  deductStockForOrder,
-  restoreStockForOrder,
-} from "../services/inventory.service";
-
-const getNextOrderNumber = async (
-  tx: Prisma.TransactionClient,
-  restaurantId: string,
-): Promise<string> => {
-  const lastOrder = await tx.order.findFirst({
-    where: { restaurantId },
-    orderBy: { createdAt: "desc" },
-    select: { orderNumber: true },
-  });
-
-  return lastOrder
-    ? `ORD-${(parseInt(lastOrder.orderNumber.split("-")[1]) + 1).toString().padStart(6, "0")}`
-    : "ORD-000001";
-};
+  addItemsToOrderTransactional,
+  applyPromotionToOrderTransactional,
+  createOrderTransactional,
+} from "../services/order.service";
 
 export const createOrder = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  try {
-    const { tableId, items, guestCount, notes } = req.body;
-    const restaurantId = req.user!.restaurantId;
-    const userId = req.user!.id;
+  const { tableId, items, guestCount, notes } = req.body;
+  const restaurantId = req.user!.restaurantId;
+  const userId = req.user!.id;
 
-    let order:
-      | (Prisma.OrderGetPayload<{
-          include: {
-            items: { include: { menuItem: true } };
-            table: true;
-            user: { select: { id: true; firstName: true; lastName: true } };
-          };
-        }> & { orderNumber: string })
-      | null = null;
+  const order = await createOrderTransactional({
+    restaurantId,
+    userId,
+    tableId,
+    items,
+    guestCount,
+    notes,
+  });
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        order = await prisma.$transaction(
-          async (tx) => {
-            const orderNumber = await getNextOrderNumber(tx, restaurantId);
-
-            let subtotal = 0;
-            const orderItems = [];
-
-            for (const item of items) {
-              const menuItem = await tx.menuItem.findUnique({
-                where: { id: item.menuItemId },
-              });
-
-              if (!menuItem || !menuItem.isAvailable) {
-                throw new AppError(
-                  `Menu item ${item.menuItemId} is not available`,
-                  400,
-                );
-              }
-
-              const itemTotal = menuItem.price * item.quantity;
-              subtotal += itemTotal;
-
-              orderItems.push({
-                menuItemId: item.menuItemId,
-                quantity: item.quantity,
-                unitPrice: menuItem.price,
-                total: itemTotal,
-                modifiers: item.modifiers || null,
-                notes: item.notes || null,
-              });
-            }
-
-            const restaurant = await tx.restaurant.findUnique({
-              where: { id: restaurantId },
-              select: { taxRate: true, serviceCharge: true },
-            });
-
-            if (!restaurant) {
-              throw new AppError("Restaurant not found", 404);
-            }
-
-            const tax = subtotal * (restaurant.taxRate / 100);
-            const serviceCharge = subtotal * (restaurant.serviceCharge / 100);
-            const total = subtotal + tax + serviceCharge;
-
-            const createdOrder = await tx.order.create({
-              data: {
-                restaurantId,
-                tableId,
-                userId,
-                orderNumber,
-                status: OrderStatus.PENDING,
-                subtotal,
-                tax,
-                serviceCharge,
-                total,
-                guestCount: guestCount || 1,
-                notes,
-                paymentStatus: PaymentStatus.PENDING,
-                items: {
-                  create: orderItems,
-                },
-              },
-              include: {
-                items: {
-                  include: {
-                    menuItem: true,
-                  },
-                },
-                table: true,
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                  },
-                },
-              },
-            });
-
-            if (tableId) {
-              await tx.table.update({
-                where: { id: tableId },
-                data: { status: "OCCUPIED" },
-              });
-            }
-
-            await deductStockForOrder(
-              restaurantId,
-              items.map((item: { menuItemId: string; quantity: number }) => ({
-                menuItemId: item.menuItemId,
-                quantity: item.quantity,
-              })),
-              userId,
-              orderNumber,
-              tx,
-            );
-
-            return createdOrder;
-          },
-          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-        );
-        break;
-      } catch (error) {
-        const isUniqueConflict =
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2002";
-        if (isUniqueConflict && attempt < 2) {
-          continue;
-        }
-        throw error;
-      }
-    }
-
-    if (!order) {
-      throw new AppError("Failed to create order", 500);
-    }
-
-    getIO().to(`restaurant:${restaurantId}`).emit("order:created", order);
-
-    res.status(201).json(order);
-  } catch (error) {
-    throw error;
-  }
+  getIO().to(`restaurant:${restaurantId}`).emit("order:created", order);
+  res.status(201).json(order);
 };
 
 export const getOrders = async (req: Request, res: Response): Promise<void> => {
   try {
     const restaurantId = req.user!.restaurantId;
-    const { status, date, tableId } = req.query;
+    const { status, date, tableId, sort } = req.query;
 
     const where: any = { restaurantId };
+    const sortValue =
+      (sort as "createdAt_desc" | "createdAt_asc" | "total_desc" | "total_asc" | undefined) ??
+      "createdAt_desc";
+    const orderByMap: Record<
+      "createdAt_desc" | "createdAt_asc" | "total_desc" | "total_asc",
+      Prisma.OrderOrderByWithRelationInput
+    > = {
+      createdAt_desc: { createdAt: "desc" },
+      createdAt_asc: { createdAt: "asc" },
+      total_desc: { total: "desc" },
+      total_asc: { total: "asc" },
+    };
 
     if (status) {
       where.status = status;
@@ -213,24 +86,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
           },
         },
       },
-      orderBy: { createdAt: "desc" },
-    });
-
-    const statusPriority: Record<string, number> = {
-      PENDING: 0,
-      CONFIRMED: 1,
-      PREPARING: 2,
-      READY: 3,
-      SERVED: 4,
-      PAID: 5,
-      CANCELLED: 6,
-    };
-
-    orders.sort((a, b) => {
-      const pa = statusPriority[a.status] ?? 99;
-      const pb = statusPriority[b.status] ?? 99;
-      if (pa !== pb) return pa - pb;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      orderBy: orderByMap[sortValue],
     });
 
     res.json(orders);
@@ -367,119 +223,20 @@ export const addItemsToOrder = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { items } = req.body;
-    const restaurantId = req.user!.restaurantId;
-    const userId = req.user!.id;
+  const { id } = req.params;
+  const { items } = req.body;
+  const restaurantId = req.user!.restaurantId;
+  const userId = req.user!.id;
 
-    const order = await prisma.order.findFirst({
-      where: { id, restaurantId },
-      include: { items: true },
-    });
+  const updatedOrder = await addItemsToOrderTransactional({
+    orderId: id,
+    restaurantId,
+    userId,
+    items,
+  });
 
-    if (!order) {
-      throw new AppError("Order not found", 404);
-    }
-
-    if (
-      order.status === OrderStatus.PAID ||
-      order.status === OrderStatus.CANCELLED
-    ) {
-      throw new AppError(
-        "Cannot add items to a completed or cancelled order",
-        400,
-      );
-    }
-
-    const updatedOrder = await prisma.$transaction(
-      async (tx) => {
-        let additionalSubtotal = 0;
-        const newItems = [];
-
-        for (const item of items) {
-          const menuItem = await tx.menuItem.findUnique({
-            where: { id: item.menuItemId },
-          });
-
-          if (!menuItem || !menuItem.isAvailable) {
-            throw new AppError(
-              `Menu item ${item.menuItemId} is not available`,
-              400,
-            );
-          }
-
-          const itemTotal = menuItem.price * item.quantity;
-          additionalSubtotal += itemTotal;
-
-          newItems.push({
-            orderId: order.id,
-            menuItemId: item.menuItemId,
-            quantity: item.quantity,
-            unitPrice: menuItem.price,
-            total: itemTotal,
-            modifiers: item.modifiers || null,
-            notes: item.notes || null,
-          });
-        }
-
-        const restaurant = await tx.restaurant.findUnique({
-          where: { id: restaurantId },
-          select: { taxRate: true, serviceCharge: true },
-        });
-
-        if (!restaurant) {
-          throw new AppError("Restaurant not found", 404);
-        }
-
-        const newSubtotal = order.subtotal + additionalSubtotal;
-        const newTax = newSubtotal * (restaurant.taxRate / 100);
-        const newServiceCharge = newSubtotal * (restaurant.serviceCharge / 100);
-        const newTotal = newSubtotal + newTax + newServiceCharge - order.discount;
-
-        await tx.orderItem.createMany({ data: newItems });
-
-        await deductStockForOrder(
-          restaurantId,
-          items.map((item: { menuItemId: string; quantity: number }) => ({
-            menuItemId: item.menuItemId,
-            quantity: item.quantity,
-          })),
-          userId,
-          order.orderNumber,
-          tx,
-        );
-
-        return tx.order.update({
-          where: { id },
-          data: {
-            subtotal: newSubtotal,
-            tax: newTax,
-            serviceCharge: newServiceCharge,
-            total: newTotal,
-          },
-          include: {
-            items: {
-              include: { menuItem: true },
-            },
-            table: true,
-            user: {
-              select: { id: true, firstName: true, lastName: true },
-            },
-          },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-
-    getIO()
-      .to(`restaurant:${restaurantId}`)
-      .emit("order:updated", updatedOrder);
-
-    res.json(updatedOrder);
-  } catch (error) {
-    throw error;
-  }
+  getIO().to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
+  res.json(updatedOrder);
 };
 
 export const cancelOrder = async (
@@ -551,4 +308,26 @@ export const cancelOrder = async (
   } catch (error) {
     throw error;
   }
+};
+
+export const applyPromotionToOrder = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const { id } = req.params;
+  const { promotionId, promotionCode } = req.body as {
+    promotionId?: string | null;
+    promotionCode?: string | null;
+  };
+  const restaurantId = req.user!.restaurantId;
+
+  const updatedOrder = await applyPromotionToOrderTransactional({
+    orderId: id,
+    restaurantId,
+    promotionId,
+    promotionCode,
+  });
+
+  getIO().to(`restaurant:${restaurantId}`).emit("order:updated", updatedOrder);
+  res.json(updatedOrder);
 };

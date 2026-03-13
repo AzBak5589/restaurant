@@ -7,9 +7,18 @@ import { getIO } from '../config/socket';
 
 export const getInventoryItems = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { category, location, lowStock } = req.query;
+  const { category, location, lowStock, sort } = req.query;
 
   const where: Record<string, unknown> = { restaurantId, isActive: true };
+  const sortValue =
+    (sort as "name_asc" | "name_desc" | "currentStock_asc" | "currentStock_desc" | undefined) ??
+    "name_asc";
+  const orderByMap = {
+    name_asc: { name: "asc" },
+    name_desc: { name: "desc" },
+    currentStock_asc: { currentStock: "asc" },
+    currentStock_desc: { currentStock: "desc" },
+  } as const;
 
   if (category) where.category = category;
   if (location) where.location = location;
@@ -25,7 +34,7 @@ export const getInventoryItems = async (req: Request, res: Response): Promise<vo
     include: {
       _count: { select: { movements: true, recipes: true } },
     },
-    orderBy: { name: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   if (lowStock === 'true') {
@@ -161,9 +170,14 @@ export const deleteInventoryItem = async (req: Request, res: Response): Promise<
 
 export const getMovements = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { itemId, type, startDate, endDate } = req.query;
+  const { itemId, type, startDate, endDate, sort } = req.query;
 
   const where: Record<string, unknown> = { restaurantId };
+  const sortValue = (sort as "createdAt_desc" | "createdAt_asc" | undefined) ?? "createdAt_desc";
+  const orderByMap = {
+    createdAt_desc: { createdAt: "desc" },
+    createdAt_asc: { createdAt: "asc" },
+  } as const;
 
   if (itemId) where.itemId = itemId;
   if (type) where.type = type;
@@ -180,7 +194,7 @@ export const getMovements = async (req: Request, res: Response): Promise<void> =
     include: {
       item: { select: { id: true, name: true, sku: true, unit: true } },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: orderByMap[sortValue],
     take: 200,
   });
 
@@ -348,7 +362,10 @@ export const getLowStockAlerts = async (req: Request, res: Response): Promise<vo
 
 export const getStockValuation = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { category, location } = req.query;
+  const { category, location, sort } = req.query;
+  const sortValue =
+    (sort as "name_asc" | "name_desc" | "totalValue_desc" | "totalValue_asc" | undefined) ??
+    "name_asc";
 
   const where: Record<string, unknown> = { restaurantId, isActive: true };
   if (category) where.category = category;
@@ -356,7 +373,7 @@ export const getStockValuation = async (req: Request, res: Response): Promise<vo
 
   const items = await prisma.inventoryItem.findMany({
     where,
-    orderBy: { name: 'asc' },
+    orderBy: { name: "asc" },
   });
 
   const valuation = items.map((item) => ({
@@ -374,10 +391,17 @@ export const getStockValuation = async (req: Request, res: Response): Promise<vo
   const totalValue = valuation.reduce((sum, item) => sum + item.totalValue, 0);
   const totalItems = valuation.reduce((sum, item) => sum + item.currentStock, 0);
 
+  const sortedValuation = [...valuation].sort((a, b) => {
+    if (sortValue === "name_asc") return a.name.localeCompare(b.name);
+    if (sortValue === "name_desc") return b.name.localeCompare(a.name);
+    if (sortValue === "totalValue_asc") return a.totalValue - b.totalValue;
+    return b.totalValue - a.totalValue;
+  });
+
   res.json({
     totalValue,
     totalItems,
-    itemCount: valuation.length,
-    items: valuation,
+    itemCount: sortedValuation.length,
+    items: sortedValuation,
   });
 };

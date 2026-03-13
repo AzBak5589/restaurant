@@ -105,7 +105,7 @@ export default function StaffPage() {
 
   const createStaff = async () => {
     if (!form.firstName.trim() || !form.email.trim() || !form.password.trim()) {
-      toast.error("Name, email and password are required");
+      toast.error(t("staff.error.requiredCreate"));
       return;
     }
     setCreating(true);
@@ -116,7 +116,7 @@ export default function StaffPage() {
       setForm({ ...emptyForm });
       fetchStaff();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create staff"));
+      toast.error(getApiErrorMessage(error, t("staff.error.create")));
     } finally {
       setCreating(false);
     }
@@ -137,7 +137,7 @@ export default function StaffPage() {
 
   const saveEdit = async () => {
     if (!editForm.firstName.trim() || !editForm.email.trim()) {
-      toast.error("Name and email are required");
+      toast.error(t("staff.error.requiredUpdate"));
       return;
     }
     setSaving(true);
@@ -153,11 +153,11 @@ export default function StaffPage() {
         data.password = editForm.password;
       }
       await api.patch(`/staff/${editId}`, data);
-      toast.success("Staff updated");
+      toast.success(t("staff.toast.updated"));
       setEditOpen(false);
       fetchStaff();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to update staff"));
+      toast.error(getApiErrorMessage(error, t("staff.error.update")));
     } finally {
       setSaving(false);
     }
@@ -174,7 +174,8 @@ export default function StaffPage() {
   };
 
   const deleteStaff = async (s: StaffMember) => {
-    if (!confirm(`Deactivate "${s.firstName} ${s.lastName}"?`)) return;
+    if (!confirm(`${t("staff.confirm.deactivate")} "${s.firstName} ${s.lastName}"?`))
+      return;
     if (s.isActive) {
       await toggleActive(s.id);
     }
@@ -292,7 +293,7 @@ export default function StaffPage() {
           <DialogHeader>
             <DialogTitle>
               <Pencil className="mr-2 inline h-4 w-4" />
-              Edit Staff Member
+              {t("staff.editMember")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -363,11 +364,11 @@ export default function StaffPage() {
                 onChange={(e) =>
                   setEditForm({ ...editForm, password: e.target.value })
                 }
-                placeholder="Leave blank to keep current"
+                placeholder={t("staff.passwordOptional")}
               />
             </div>
             <Button className="w-full" onClick={saveEdit} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("common.saving") : t("customers.saveChanges")}
             </Button>
           </div>
         </DialogContent>
@@ -405,7 +406,7 @@ export default function StaffPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(s)}>
-                          <Pencil className="mr-2 h-4 w-4" /> Edit
+                          <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => toggleActive(s.id)}>
                           {s.isActive ? (
@@ -413,14 +414,16 @@ export default function StaffPage() {
                           ) : (
                             <UserCheck className="mr-2 h-4 w-4" />
                           )}
-                          {s.isActive ? "Deactivate" : "Activate"}
+                          {s.isActive
+                            ? t("customers.deactivate")
+                            : t("customers.activate")}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
                           onClick={() => deleteStaff(s)}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -438,7 +441,8 @@ export default function StaffPage() {
                   </Badge>
                   {s.lastLogin && (
                     <span className="text-xs text-muted-foreground">
-                      Last: {new Date(s.lastLogin).toLocaleDateString()}
+                      {t("staff.lastLoginShort")}:{" "}
+                      {new Date(s.lastLogin).toLocaleDateString()}
                     </span>
                   )}
                 </div>

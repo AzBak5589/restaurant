@@ -374,3 +374,69 @@ export const getTableTurnoverReport = async (req: Request, res: Response): Promi
 
   res.json(report.sort((a, b) => b.totalRevenue - a.totalRevenue));
 };
+
+export const getPromotionPerformance = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const restaurantId = req.user!.restaurantId;
+  const { start, end } = buildDateRange(req.query);
+
+  const grouped = await prisma.order.groupBy({
+    by: ["appliedPromotionCode"],
+    where: {
+      restaurantId,
+      paymentStatus: "PAID",
+      createdAt: { gte: start, lte: end },
+      appliedPromotionCode: { not: null },
+      discount: { gt: 0 },
+    },
+    _count: { id: true },
+    _sum: {
+      subtotal: true,
+      discount: true,
+      total: true,
+    },
+  });
+
+  const totalDiscount = grouped.reduce(
+    (sum, row) => sum + (row._sum.discount || 0),
+    0,
+  );
+  const totalRevenueAfterDiscount = grouped.reduce(
+    (sum, row) => sum + (row._sum.total || 0),
+    0,
+  );
+  const totalRevenueBeforeDiscount = grouped.reduce(
+    (sum, row) => sum + (row._sum.subtotal || 0),
+    0,
+  );
+
+  res.json({
+    period: { start: start.toISOString(), end: end.toISOString() },
+    summary: {
+      promoOrders: grouped.reduce((sum, row) => sum + row._count.id, 0),
+      totalDiscount: Math.round(totalDiscount * 100) / 100,
+      revenueBeforeDiscount: Math.round(totalRevenueBeforeDiscount * 100) / 100,
+      revenueAfterDiscount: Math.round(totalRevenueAfterDiscount * 100) / 100,
+    },
+    promotions: grouped
+      .map((row) => {
+        const discount = row._sum.discount || 0;
+        const revenueAfterDiscount = row._sum.total || 0;
+        const revenueBeforeDiscount = row._sum.subtotal || 0;
+        return {
+          code: row.appliedPromotionCode,
+          orders: row._count.id,
+          totalDiscount: Math.round(discount * 100) / 100,
+          revenueBeforeDiscount: Math.round(revenueBeforeDiscount * 100) / 100,
+          revenueAfterDiscount: Math.round(revenueAfterDiscount * 100) / 100,
+          avgDiscountPerOrder:
+            row._count.id > 0
+              ? Math.round((discount / row._count.id) * 100) / 100
+              : 0,
+        };
+      })
+      .sort((a, b) => b.totalDiscount - a.totalDiscount),
+  });
+};

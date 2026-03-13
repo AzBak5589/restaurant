@@ -68,6 +68,8 @@ const statusConfig: Record<string, { color: string; bg: string }> = {
   },
 };
 
+const defaultZone = "Main Hall";
+
 export default function TablesPage() {
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +77,7 @@ export default function TablesPage() {
   const [form, setForm] = useState({
     number: "",
     capacity: "4",
-    zone: "Main Hall",
+    zone: defaultZone,
   });
   const [creating, setCreating] = useState(false);
   const { t } = useI18n();
@@ -118,10 +120,10 @@ export default function TablesPage() {
       });
       toast.success(t("tables.addTable") + " ✓");
       setCreateOpen(false);
-      setForm({ number: "", capacity: "4", zone: "Main Hall" });
+      setForm({ number: "", capacity: "4", zone: defaultZone });
       fetchTables();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, t("common.noResults")));
+      toast.error(getApiErrorMessage(error, t("tables.error.create")));
     } finally {
       setCreating(false);
     }
@@ -146,19 +148,19 @@ export default function TablesPage() {
 
   const seatClient = async () => {
     if (!seatForm.customerName.trim()) {
-      toast.error("Customer name is required");
+      toast.error(t("tables.error.customerNameRequired"));
       return;
     }
     setSeating(true);
     try {
       await api.patch(`/tables/${seatTableId}/status`, { status: "OCCUPIED" });
       toast.success(
-        `Table ${seatTableNumber} — ${seatForm.customerName} seated`,
+        `${t("orders.table")} ${seatTableNumber} — ${seatForm.customerName} ${t("tables.toast.seated")}`,
       );
       setSeatOpen(false);
       fetchTables();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to seat client"));
+      toast.error(getApiErrorMessage(error, t("tables.error.seatClient")));
     } finally {
       setSeating(false);
     }
@@ -197,7 +199,7 @@ export default function TablesPage() {
                     onChange={(e) =>
                       setForm({ ...form, number: e.target.value })
                     }
-                    placeholder="e.g. 8"
+                    placeholder={t("tables.placeholder.number")}
                   />
                 </div>
                 <div className="space-y-2">
@@ -216,7 +218,7 @@ export default function TablesPage() {
                   <Input
                     value={form.zone}
                     onChange={(e) => setForm({ ...form, zone: e.target.value })}
-                    placeholder="Main Hall, Terrace, VIP..."
+                    placeholder={t("tables.placeholder.zone")}
                   />
                 </div>
                 <Button
@@ -238,23 +240,23 @@ export default function TablesPage() {
           <DialogHeader>
             <DialogTitle>
               <UserPlus className="mr-2 inline h-5 w-5" />
-              Seat Client — Table {seatTableNumber}
+              {t("tables.seatClient")} — {t("orders.table")} {seatTableNumber}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Customer Name *</Label>
+              <Label>{t("reservations.customerName")} *</Label>
               <Input
                 value={seatForm.customerName}
                 onChange={(e) =>
                   setSeatForm({ ...seatForm, customerName: e.target.value })
                 }
-                placeholder="Walk-in client name"
+                placeholder={t("tables.placeholder.walkInName")}
                 autoFocus
               />
             </div>
             <div className="space-y-2">
-              <Label>Guests</Label>
+              <Label>{t("orders.guests")}</Label>
               <Input
                 type="number"
                 min="1"
@@ -266,7 +268,7 @@ export default function TablesPage() {
             </div>
             <Button className="w-full" onClick={seatClient} disabled={seating}>
               <UserPlus className="mr-1 h-4 w-4" />
-              {seating ? "Seating..." : "Seat Client"}
+              {seating ? t("tables.seating") : t("tables.seatClient")}
             </Button>
           </div>
         </DialogContent>
@@ -361,7 +363,7 @@ export default function TablesPage() {
                               className="text-xs"
                               onClick={() => openSeatDialog(table)}
                             >
-                              <UserPlus className="mr-1 h-3 w-3" /> Seat Client
+                              <UserPlus className="mr-1 h-3 w-3" /> {t("tables.seatClient")}
                             </Button>
                           )}
                           {table.status === "OCCUPIED" && (
@@ -373,8 +375,8 @@ export default function TablesPage() {
                                   className="text-xs"
                                   onClick={() => router.push("/orders")}
                                 >
-                                  <ShoppingCart className="mr-1 h-3 w-3" /> New
-                                  Order
+                                  <ShoppingCart className="mr-1 h-3 w-3" />
+                                  {t("orders.newOrder")}
                                 </Button>
                               )}
                               <Button

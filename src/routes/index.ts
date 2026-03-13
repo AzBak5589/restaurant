@@ -13,6 +13,7 @@ import digitalMenuRoutes from "./digitalmenu.routes";
 import recipeRoutes from "./recipe.routes";
 import activityRoutes from "./activity.routes";
 import expenseRoutes from "./expense.routes";
+import promotionRoutes from "./promotion.routes";
 import superadminRoutes from "./superadmin.routes";
 import restaurantRoutes from "./restaurant.routes";
 
@@ -34,6 +35,7 @@ router.use("/digital-menu", digitalMenuRoutes);
 router.use("/recipes", recipeRoutes);
 router.use("/activity", activityRoutes);
 router.use("/expenses", expenseRoutes);
+router.use("/promotions", promotionRoutes);
 
 router.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

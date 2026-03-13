@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { useI18n } from "@/lib/i18n";
 
 interface Movement {
   id: string;
@@ -95,6 +96,7 @@ const emptyForm = {
 };
 
 export default function InventoryPage() {
+  const { t } = useI18n();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -135,7 +137,7 @@ export default function InventoryPage() {
       const res = await api.get("/inventory/items");
       setItems(res.data);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load inventory"));
+      toast.error(getApiErrorMessage(error, t("inventory.error.load")));
     } finally {
       setLoading(false);
     }
@@ -144,6 +146,7 @@ export default function InventoryPage() {
   useEffect(() => {
     fetchItems();
     fetchValuation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchValuation = async () => {
@@ -165,7 +168,7 @@ export default function InventoryPage() {
       });
       setMovements(res.data);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load history"));
+      toast.error(getApiErrorMessage(error, t("inventory.error.loadHistory")));
     } finally {
       setLoadingHistory(false);
     }
@@ -174,7 +177,7 @@ export default function InventoryPage() {
   // ─── CREATE ─────────────────────────────────────────────────
   const createItem = async () => {
     if (!form.name.trim()) {
-      toast.error("Name is required");
+      toast.error(t("inventory.error.requiredName"));
       return;
     }
     setCreating(true);
@@ -189,12 +192,12 @@ export default function InventoryPage() {
         supplier: form.supplier || undefined,
         category: form.category || undefined,
       });
-      toast.success("Inventory item created");
+      toast.success(t("inventory.toast.created"));
       setCreateOpen(false);
       setForm({ ...emptyForm });
       fetchItems();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create item"));
+      toast.error(getApiErrorMessage(error, t("inventory.error.create")));
     } finally {
       setCreating(false);
     }
@@ -220,7 +223,7 @@ export default function InventoryPage() {
 
   const saveEdit = async () => {
     if (!editForm.name.trim()) {
-      toast.error("Name is required");
+      toast.error(t("inventory.error.requiredName"));
       return;
     }
     setSaving(true);
@@ -249,11 +252,11 @@ export default function InventoryPage() {
         });
       }
 
-      toast.success("Item updated");
+      toast.success(t("inventory.toast.updated"));
       setEditOpen(false);
       fetchItems();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to update item"));
+      toast.error(getApiErrorMessage(error, t("inventory.error.update")));
     } finally {
       setSaving(false);
     }
@@ -261,13 +264,13 @@ export default function InventoryPage() {
 
   // ─── DELETE ─────────────────────────────────────────────────
   const deleteItem = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This will deactivate the item.`)) return;
+    if (!confirm(`${t("inventory.confirm.delete")} "${name}"?`)) return;
     try {
       await api.delete(`/inventory/items/${id}`);
-      toast.success(`"${name}" deleted`);
+      toast.success(`${t("inventory.toast.deleted")} "${name}"`);
       fetchItems();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to delete item"));
+      toast.error(getApiErrorMessage(error, t("inventory.error.delete")));
     }
   };
 
@@ -282,7 +285,7 @@ export default function InventoryPage() {
     if (!stockItem) return;
     const qty = parseFloat(stockForm.quantity);
     if (!qty || qty <= 0) {
-      toast.error("Enter a valid quantity");
+      toast.error(t("inventory.error.invalidQuantity"));
       return;
     }
     setAdjusting(true);
@@ -295,17 +298,17 @@ export default function InventoryPage() {
       });
       const label =
         stockForm.type === "IN"
-          ? "added"
+          ? t("inventory.adjust.added")
           : stockForm.type === "OUT"
-            ? "removed"
+            ? t("inventory.adjust.removed")
             : stockForm.type === "LOSS"
-              ? "lost"
-              : "returned";
+              ? t("inventory.adjust.lost")
+              : t("inventory.adjust.returned");
       toast.success(`${qty} ${stockItem.unit} ${label} — ${stockItem.name}`);
       setStockOpen(false);
       fetchItems();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to adjust stock"));
+      toast.error(getApiErrorMessage(error, t("inventory.error.adjust")));
     } finally {
       setAdjusting(false);
     }
@@ -323,32 +326,32 @@ export default function InventoryPage() {
     <>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>Name *</Label>
+          <Label>{t("common.name")} *</Label>
           <Input
             value={f.name}
             onChange={(e) => setF({ ...f, name: e.target.value })}
           />
         </div>
         <div className="space-y-2">
-          <Label>SKU</Label>
+          <Label>{t("inventory.sku")}</Label>
           <Input
             value={f.sku}
             onChange={(e) => setF({ ...f, sku: e.target.value })}
-            placeholder="Optional"
+            placeholder={t("inventory.optional")}
           />
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
-          <Label>Unit</Label>
+          <Label>{t("inventory.unit")}</Label>
           <Input
             value={f.unit}
             onChange={(e) => setF({ ...f, unit: e.target.value })}
-            placeholder="kg, L, pcs..."
+            placeholder={t("inventory.unitPlaceholder")}
           />
         </div>
         <div className="space-y-2">
-          <Label>Min Stock</Label>
+          <Label>{t("inventory.minStock")}</Label>
           <Input
             type="number"
             value={f.minStock}
@@ -356,18 +359,18 @@ export default function InventoryPage() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Max Stock</Label>
+          <Label>{t("inventory.maxStock")}</Label>
           <Input
             type="number"
             value={f.maxStock}
             onChange={(e) => setF({ ...f, maxStock: e.target.value })}
-            placeholder="Optional"
+            placeholder={t("inventory.optional")}
           />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>Unit Cost (FCFA)</Label>
+          <Label>{t("inventory.unitCost")} (FCFA)</Label>
           <Input
             type="number"
             value={f.unitCost}
@@ -375,7 +378,7 @@ export default function InventoryPage() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Supplier</Label>
+          <Label>{t("inventory.supplier")}</Label>
           <Input
             value={f.supplier}
             onChange={(e) => setF({ ...f, supplier: e.target.value })}
@@ -383,11 +386,11 @@ export default function InventoryPage() {
         </div>
       </div>
       <div className="space-y-2">
-        <Label>Category</Label>
+        <Label>{t("inventory.category")}</Label>
         <Input
           value={f.category}
           onChange={(e) => setF({ ...f, category: e.target.value })}
-          placeholder="Produce, Meat, Beverages..."
+          placeholder={t("inventory.categoryPlaceholder")}
         />
       </div>
     </>
@@ -397,22 +400,24 @@ export default function InventoryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Inventory</h1>
-          <p className="text-muted-foreground">{items.length} items tracked</p>
+          <h1 className="text-2xl font-bold">{t("inventory.title")}</h1>
+          <p className="text-muted-foreground">
+            {items.length} {t("inventory.itemsTracked")}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchItems}>
-            <RefreshCw className="mr-1 h-4 w-4" /> Refresh
+            <RefreshCw className="mr-1 h-4 w-4" /> {t("common.refresh")}
           </Button>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
-                <Plus className="mr-1 h-4 w-4" /> Add Item
+                <Plus className="mr-1 h-4 w-4" /> {t("inventory.addItem")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add Inventory Item</DialogTitle>
+                <DialogTitle>{t("inventory.addInventoryItem")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 {renderFormFields(form, setForm)}
@@ -421,7 +426,7 @@ export default function InventoryPage() {
                   onClick={createItem}
                   disabled={creating}
                 >
-                  {creating ? "Creating..." : "Add Item"}
+                  {creating ? t("common.creating") : t("inventory.addItem")}
                 </Button>
               </div>
             </DialogContent>
@@ -435,13 +440,13 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle>
               <Pencil className="mr-2 inline h-4 w-4" />
-              Edit Inventory Item
+              {t("inventory.editInventoryItem")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Name *</Label>
+                <Label>{t("common.name")} *</Label>
                 <Input
                   value={editForm.name}
                   onChange={(e) =>
@@ -450,29 +455,29 @@ export default function InventoryPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>SKU</Label>
+                <Label>{t("inventory.sku")}</Label>
                 <Input
                   value={editForm.sku}
                   onChange={(e) =>
                     setEditForm({ ...editForm, sku: e.target.value })
                   }
-                  placeholder="Optional"
+                  placeholder={t("inventory.optional")}
                 />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label>Unit</Label>
+                <Label>{t("inventory.unit")}</Label>
                 <Input
                   value={editForm.unit}
                   onChange={(e) =>
                     setEditForm({ ...editForm, unit: e.target.value })
                   }
-                  placeholder="kg, L, pcs..."
+                  placeholder={t("inventory.unitPlaceholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Min Stock</Label>
+                <Label>{t("inventory.minStock")}</Label>
                 <Input
                   type="number"
                   value={editForm.minStock}
@@ -482,19 +487,19 @@ export default function InventoryPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Max Stock</Label>
+                <Label>{t("inventory.maxStock")}</Label>
                 <Input
                   type="number"
                   value={editForm.maxStock}
                   onChange={(e) =>
                     setEditForm({ ...editForm, maxStock: e.target.value })
                   }
-                  placeholder="Optional"
+                  placeholder={t("inventory.optional")}
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Current Stock</Label>
+              <Label>{t("inventory.currentStock")}</Label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -511,19 +516,19 @@ export default function InventoryPage() {
                     variant="outline"
                     className="whitespace-nowrap text-xs"
                   >
-                    was {editOriginalStock}
+                    {t("inventory.was")} {editOriginalStock}
                   </Badge>
                 )}
               </div>
               {parseFloat(editForm.currentStock) !== editOriginalStock && (
                 <p className="text-xs text-muted-foreground">
-                  A stock movement will be recorded automatically.
+                  {t("inventory.stockMovementAuto")}
                 </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Unit Cost (FCFA)</Label>
+                <Label>{t("inventory.unitCost")} (FCFA)</Label>
                 <Input
                   type="number"
                   value={editForm.unitCost}
@@ -533,7 +538,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Supplier</Label>
+                <Label>{t("inventory.supplier")}</Label>
                 <Input
                   value={editForm.supplier}
                   onChange={(e) =>
@@ -543,17 +548,17 @@ export default function InventoryPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Category</Label>
+              <Label>{t("inventory.category")}</Label>
               <Input
                 value={editForm.category}
                 onChange={(e) =>
                   setEditForm({ ...editForm, category: e.target.value })
                 }
-                placeholder="Produce, Meat, Beverages..."
+                placeholder={t("inventory.categoryPlaceholder")}
               />
             </div>
             <Button className="w-full" onClick={saveEdit} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? t("common.saving") : t("customers.saveChanges")}
             </Button>
           </div>
         </DialogContent>
@@ -565,14 +570,14 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle>
               <ArrowUpCircle className="mr-2 inline h-4 w-4" />
-              Adjust Stock — {stockItem?.name}
+              {t("inventory.adjustStock")} — {stockItem?.name}
             </DialogTitle>
           </DialogHeader>
           {stockItem && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-3">
                 <span className="text-sm text-muted-foreground">
-                  Current stock:
+                  {t("inventory.currentStock")}:
                 </span>
                 <span className="text-lg font-bold">
                   {stockItem.currentStock} {stockItem.unit}
@@ -580,7 +585,7 @@ export default function InventoryPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Movement Type *</Label>
+                  <Label>{t("inventory.movementType")} *</Label>
                   <Select
                     value={stockForm.type}
                     onValueChange={(v) =>
@@ -594,17 +599,17 @@ export default function InventoryPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="IN">Stock In (purchase)</SelectItem>
-                      <SelectItem value="OUT">Stock Out (usage)</SelectItem>
+                      <SelectItem value="IN">{t("inventory.movement.in")}</SelectItem>
+                      <SelectItem value="OUT">{t("inventory.movement.out")}</SelectItem>
                       <SelectItem value="LOSS">
-                        Loss (spoilage/damage)
+                        {t("inventory.movement.loss")}
                       </SelectItem>
-                      <SelectItem value="RETURN">Return</SelectItem>
+                      <SelectItem value="RETURN">{t("inventory.movement.return")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Quantity ({stockItem.unit}) *</Label>
+                  <Label>{t("inventory.quantity")} ({stockItem.unit}) *</Label>
                   <Input
                     type="number"
                     min="0.01"
@@ -618,13 +623,13 @@ export default function InventoryPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Notes</Label>
+                <Label>{t("common.notes")}</Label>
                 <Input
                   value={stockForm.notes}
                   onChange={(e) =>
                     setStockForm({ ...stockForm, notes: e.target.value })
                   }
-                  placeholder="Optional reason..."
+                  placeholder={t("inventory.optionalReason")}
                 />
               </div>
               <Button
@@ -633,8 +638,8 @@ export default function InventoryPage() {
                 disabled={adjusting}
               >
                 {adjusting
-                  ? "Adjusting..."
-                  : `${["IN", "RETURN"].includes(stockForm.type) ? "Add" : "Remove"} Stock`}
+                  ? t("inventory.adjusting")
+                  : `${["IN", "RETURN"].includes(stockForm.type) ? t("inventory.addStock") : t("inventory.removeStock")}`}
               </Button>
             </div>
           )}
@@ -647,7 +652,7 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle>
               <History className="mr-2 inline h-4 w-4" />
-              Movement History — {historyItem?.name}
+              {t("inventory.movementHistory")} — {historyItem?.name}
             </DialogTitle>
           </DialogHeader>
           {loadingHistory ? (
@@ -656,17 +661,17 @@ export default function InventoryPage() {
             </div>
           ) : movements.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground">
-              No movements recorded
+              {t("inventory.noMovements")}
             </p>
           ) : (
             <div className="max-h-[400px] overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead>Notes</TableHead>
+                    <TableHead>{t("common.date")}</TableHead>
+                    <TableHead>{t("common.type")}</TableHead>
+                    <TableHead className="text-right">{t("inventory.qty")}</TableHead>
+                    <TableHead>{t("common.notes")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -725,7 +730,7 @@ export default function InventoryPage() {
                   <DollarSign className="h-5 w-5 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Stock Value</p>
+                  <p className="text-sm text-muted-foreground">{t("inventory.stockValue")}</p>
                   <p className="text-lg font-bold">
                     {valuation.totalValue.toLocaleString()} FCFA
                   </p>
@@ -738,7 +743,7 @@ export default function InventoryPage() {
                   <Package className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Items Tracked</p>
+                  <p className="text-sm text-muted-foreground">{t("inventory.itemsTracked")}</p>
                   <p className="text-lg font-bold">{valuation.itemCount}</p>
                 </div>
               </CardContent>
@@ -752,9 +757,10 @@ export default function InventoryPage() {
                 <TrendingDown className="h-5 w-5 text-amber-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Low Stock</p>
+                <p className="text-sm text-muted-foreground">{t("inventory.lowStock")}</p>
                 <p className="text-lg font-bold text-amber-600">
-                  {lowStockCount} item{lowStockCount > 1 ? "s" : ""}
+                  {lowStockCount} {t("inventory.itemWord")}
+                  {lowStockCount > 1 ? t("inventory.itemPluralSuffix") : ""}
                 </p>
               </div>
             </CardContent>
@@ -770,7 +776,7 @@ export default function InventoryPage() {
         <Card>
           <CardContent className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
             <Package className="h-8 w-8" />
-            No inventory items yet
+            {t("inventory.noInventoryItems")}
           </CardContent>
         </Card>
       ) : (
@@ -778,14 +784,14 @@ export default function InventoryPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Stock</TableHead>
-                <TableHead className="text-right">Min</TableHead>
-                <TableHead>Unit</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("inventory.category")}</TableHead>
+                <TableHead className="text-right">{t("inventory.stock")}</TableHead>
+                <TableHead className="text-right">{t("inventory.minShort")}</TableHead>
+                <TableHead>{t("inventory.unit")}</TableHead>
+                <TableHead className="text-right">{t("inventory.cost")}</TableHead>
+                <TableHead>{t("inventory.supplier")}</TableHead>
+                <TableHead>{t("common.status")}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -825,11 +831,11 @@ export default function InventoryPage() {
                     <TableCell>
                       {isLow ? (
                         <Badge variant="destructive" className="text-xs">
-                          Low Stock
+                          {t("inventory.lowStock")}
                         </Badge>
                       ) : (
                         <Badge variant="default" className="text-xs">
-                          OK
+                          {t("common.ok")}
                         </Badge>
                       )}
                     </TableCell>
@@ -848,21 +854,20 @@ export default function InventoryPage() {
                           <DropdownMenuItem
                             onClick={() => openStockAdjust(item)}
                           >
-                            <ArrowUpCircle className="mr-2 h-4 w-4" /> Adjust
-                            Stock
+                            <ArrowUpCircle className="mr-2 h-4 w-4" /> {t("inventory.adjustStock")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openHistory(item)}>
-                            <History className="mr-2 h-4 w-4" /> History
+                            <History className="mr-2 h-4 w-4" /> {t("inventory.history")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openEdit(item)}>
-                            <Pencil className="mr-2 h-4 w-4" /> Edit
+                            <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => deleteItem(item.id, item.name)}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

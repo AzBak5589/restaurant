@@ -5,6 +5,7 @@ import {
   getSalesByCategory,
   getTopSellingItems,
   getTableTurnoverReport,
+  getPromotionPerformance,
 } from '../controllers/reporting.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validateTenant } from '../middlewares/tenant.middleware';
@@ -14,6 +15,7 @@ import {
   salesByCategorySchema,
   tableTurnoverSchema,
   topSellingItemsSchema,
+  promotionPerformanceSchema,
 } from '../validators/reporting.validation';
 
 const router = Router();
@@ -31,5 +33,11 @@ router.get(
 );
 router.get('/top-items', authorize('ADMIN', 'MANAGER'), validate(topSellingItemsSchema), getTopSellingItems);
 router.get('/table-turnover', authorize('ADMIN', 'MANAGER'), validate(tableTurnoverSchema), getTableTurnoverReport);
+router.get(
+  '/promotion-performance',
+  authorize('ADMIN', 'MANAGER'),
+  validate(promotionPerformanceSchema),
+  getPromotionPerformance,
+);
 
 export default router;

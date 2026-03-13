@@ -6,9 +6,14 @@ import { getIO } from '../config/socket';
 
 export const getReservations = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { date, status, tableId } = req.query;
+  const { date, status, tableId, sort } = req.query;
 
   const where: Record<string, unknown> = { restaurantId };
+  const sortValue = (sort as 'startTime_asc' | 'startTime_desc' | undefined) ?? 'startTime_asc';
+  const orderByMap = {
+    startTime_asc: { startTime: 'asc' },
+    startTime_desc: { startTime: 'desc' },
+  } as const;
   if (status) where.status = status;
   if (tableId) where.tableId = tableId;
 
@@ -27,7 +32,7 @@ export const getReservations = async (req: Request, res: Response): Promise<void
       table: { select: { id: true, number: true, capacity: true, zone: true } },
       customer: { select: { id: true, firstName: true, lastName: true } },
     },
-    orderBy: { startTime: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   res.json(reservations);
@@ -221,7 +226,12 @@ export const cancelReservation = async (req: Request, res: Response): Promise<vo
 
 export const getAvailableTables = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { date, startTime, endTime, guestCount } = req.query;
+  const { date, startTime, endTime, guestCount, sort } = req.query;
+  const sortValue = (sort as 'capacity_asc' | 'capacity_desc' | undefined) ?? 'capacity_asc';
+  const orderByMap = {
+    capacity_asc: { capacity: 'asc' },
+    capacity_desc: { capacity: 'desc' },
+  } as const;
 
   if (!date || !startTime) {
     throw new AppError('date and startTime are required', 400);
@@ -233,7 +243,7 @@ export const getAvailableTables = async (req: Request, res: Response): Promise<v
       isActive: true,
       ...(guestCount && { capacity: { gte: parseInt(guestCount as string) } }),
     },
-    orderBy: { capacity: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   const reservedTableIds = await prisma.reservation.findMany({
@@ -268,6 +278,12 @@ export const getAvailableTables = async (req: Request, res: Response): Promise<v
 
 export const getTodayReservations = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
+  const { sort } = req.query;
+  const sortValue = (sort as 'startTime_asc' | 'startTime_desc' | undefined) ?? 'startTime_asc';
+  const orderByMap = {
+    startTime_asc: { startTime: 'asc' },
+    startTime_desc: { startTime: 'desc' },
+  } as const;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -283,7 +299,7 @@ export const getTodayReservations = async (req: Request, res: Response): Promise
     include: {
       table: { select: { number: true, capacity: true, zone: true } },
     },
-    orderBy: { startTime: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   res.json(reservations);

@@ -73,7 +73,7 @@ export default function SuperAdminDashboard() {
       setRestaurants(restRes.data);
       setLogs(logsRes.data.slice(0, 10));
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load platform data"));
+      toast.error(getApiErrorMessage(error, t("superAdmin.error.loadPlatformData")));
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,9 @@ export default function SuperAdminDashboard() {
   if (user?.role !== "SUPER_ADMIN") {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-lg text-destructive font-semibold">Access denied</p>
+        <p className="text-lg text-destructive font-semibold">
+          {t("superAdmin.accessDenied")}
+        </p>
       </div>
     );
   }
@@ -107,7 +109,7 @@ export default function SuperAdminDashboard() {
         {
           label: t("superAdmin.todayOrders"),
           value: stats.todayOrders,
-          sub: `${stats.totalOrders} total`,
+          sub: `${stats.totalOrders} ${t("superAdmin.total").toLowerCase()}`,
           icon: ShoppingCart,
           color: "text-violet-500",
           bg: "bg-violet-500/10",
@@ -207,7 +209,7 @@ export default function SuperAdminDashboard() {
                     variant="outline"
                     className="bg-emerald-500/10 text-emerald-600"
                   >
-                    Online
+                    {t("superAdmin.system.online")}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
@@ -219,7 +221,7 @@ export default function SuperAdminDashboard() {
                     variant="outline"
                     className="bg-blue-500/10 text-blue-600"
                   >
-                    Active
+                    {t("superAdmin.system.active")}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
@@ -227,14 +229,18 @@ export default function SuperAdminDashboard() {
                     <HardDrive className="h-4 w-4 text-violet-500" />{" "}
                     {t("superAdmin.memoryUsage")}
                   </div>
-                  <span className="text-sm font-medium">Normal</span>
+                  <span className="text-sm font-medium">
+                    {t("superAdmin.system.normal")}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
                     <Cpu className="h-4 w-4 text-amber-500" />{" "}
                     {t("superAdmin.cpuUsage")}
                   </div>
-                  <span className="text-sm font-medium">Low</span>
+                  <span className="text-sm font-medium">
+                    {t("superAdmin.system.low")}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -266,7 +272,8 @@ export default function SuperAdminDashboard() {
                           <div>
                             <p className="text-sm font-medium">{r.name}</p>
                             <p className="text-[10px] text-muted-foreground">
-                              {r.todayOrders} orders · {r.users} users
+                              {r.todayOrders} {t("superAdmin.orders").toLowerCase()} ·{" "}
+                              {r.users} {t("superAdmin.users").toLowerCase()}
                             </p>
                           </div>
                         </div>

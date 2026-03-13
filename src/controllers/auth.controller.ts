@@ -89,6 +89,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         lastName: true,
         role: true,
         restaurantId: true,
+        refreshTokenVersion: true,
       },
     });
 
@@ -104,10 +105,18 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       restaurantId: user.restaurantId,
       email: user.email,
       role: user.role,
+      tokenVersion: user.refreshTokenVersion,
     });
 
     res.status(201).json({
-      user,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        restaurantId: user.restaurantId,
+      },
       accessToken,
       refreshToken,
     });
@@ -165,6 +174,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       restaurantId: user.restaurantId,
       email: user.email,
       role: user.role,
+      tokenVersion: user.refreshTokenVersion,
     });
 
     res.json({
@@ -239,6 +249,7 @@ export const refreshTokens = async (
         role: true,
         restaurantId: true,
         isActive: true,
+        refreshTokenVersion: true,
       },
     });
 
@@ -250,28 +261,54 @@ export const refreshTokens = async (
       throw new AppError("Account is inactive", 403);
     }
 
+    if (
+      typeof payload.tokenVersion !== "number" ||
+      payload.tokenVersion !== user.refreshTokenVersion
+    ) {
+      throw new AppError("Refresh token revoked", 401);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshTokenVersion: {
+          increment: 1,
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        restaurantId: true,
+        refreshTokenVersion: true,
+      },
+    });
+
     const accessToken = generateAccessToken({
-      id: user.id,
-      restaurantId: user.restaurantId,
-      email: user.email,
-      role: user.role,
+      id: updatedUser.id,
+      restaurantId: updatedUser.restaurantId,
+      email: updatedUser.email,
+      role: updatedUser.role,
     });
 
     const nextRefreshToken = generateRefreshToken({
-      id: user.id,
-      restaurantId: user.restaurantId,
-      email: user.email,
-      role: user.role,
+      id: updatedUser.id,
+      restaurantId: updatedUser.restaurantId,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      tokenVersion: updatedUser.refreshTokenVersion,
     });
 
     res.json({
       user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        restaurantId: user.restaurantId,
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        role: updatedUser.role,
+        restaurantId: updatedUser.restaurantId,
       },
       accessToken,
       refreshToken: nextRefreshToken,
@@ -287,4 +324,22 @@ export const refreshTokens = async (
 
     throw error;
   }
+};
+
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) {
+    throw new AppError("Unauthorized", 401);
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      refreshTokenVersion: {
+        increment: 1,
+      },
+    },
+  });
+
+  res.status(204).send();
 };

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { useI18n } from "@/lib/i18n";
 
 interface TableOption {
   id: string;
@@ -64,6 +65,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function ReservationsPage() {
+  const { t } = useI18n();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -90,7 +92,7 @@ export default function ReservationsPage() {
       const res = await api.get("/reservations");
       setReservations(res.data);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load reservations"));
+      toast.error(getApiErrorMessage(error, t("reservations.error.load")));
     } finally {
       setLoading(false);
     }
@@ -126,7 +128,7 @@ export default function ReservationsPage() {
         notes: form.notes || undefined,
         tableId: form.tableId || undefined,
       });
-      toast.success("Reservation created");
+      toast.success(t("reservations.toast.created"));
       setCreateOpen(false);
       setForm({
         customerName: "",
@@ -139,7 +141,7 @@ export default function ReservationsPage() {
       });
       fetchReservations();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create reservation"));
+      toast.error(getApiErrorMessage(error, t("reservations.error.create")));
     } finally {
       setCreating(false);
     }
@@ -148,10 +150,10 @@ export default function ReservationsPage() {
   const updateStatus = async (id: string, status: string) => {
     try {
       await api.patch(`/reservations/${id}/status`, { status });
-      toast.success(`Reservation ${status.toLowerCase()}`);
+      toast.success(`${t("reservations.title")} ${t(`reservations.${status}`)}`);
       fetchReservations();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to update reservation"));
+      toast.error(getApiErrorMessage(error, t("reservations.error.update")));
     }
   };
 
@@ -169,7 +171,7 @@ export default function ReservationsPage() {
 
   const assignTableAndSeat = async () => {
     if (!assignTableId) {
-      toast.error("Please select a table");
+      toast.error(t("reservations.error.selectTable"));
       return;
     }
     try {
@@ -181,11 +183,11 @@ export default function ReservationsPage() {
       await api.patch(`/reservations/${assignReservationId}/status`, {
         status: "SEATED",
       });
-      toast.success("Table assigned and client seated");
+      toast.success(t("reservations.toast.seated"));
       setAssignOpen(false);
       fetchReservations();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to assign table"));
+      toast.error(getApiErrorMessage(error, t("reservations.error.assignTable")));
     }
   };
 
@@ -195,29 +197,29 @@ export default function ReservationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Reservations</h1>
+          <h1 className="text-2xl font-bold">{t("reservations.title")}</h1>
           <p className="text-muted-foreground">
-            {reservations.length} reservations
+            {reservations.length} {t("reservations.totalReservations")}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchReservations}>
-            <RefreshCw className="mr-1 h-4 w-4" /> Refresh
+            <RefreshCw className="mr-1 h-4 w-4" /> {t("common.refresh")}
           </Button>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
-                <Plus className="mr-1 h-4 w-4" /> New Reservation
+                <Plus className="mr-1 h-4 w-4" /> {t("reservations.newReservation")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>New Reservation</DialogTitle>
+                <DialogTitle>{t("reservations.newReservation")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Customer Name *</Label>
+                    <Label>{t("reservations.customerName")} *</Label>
                     <Input
                       value={form.customerName}
                       onChange={(e) =>
@@ -226,7 +228,7 @@ export default function ReservationsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Phone</Label>
+                    <Label>{t("common.phone")}</Label>
                     <Input
                       value={form.customerPhone}
                       onChange={(e) =>
@@ -237,7 +239,7 @@ export default function ReservationsPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-2">
-                    <Label>Date</Label>
+                    <Label>{t("common.date")}</Label>
                     <Input
                       type="date"
                       value={form.date}
@@ -247,7 +249,7 @@ export default function ReservationsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Time</Label>
+                    <Label>{t("reservations.time")}</Label>
                     <Input
                       type="time"
                       value={form.startTime}
@@ -257,7 +259,7 @@ export default function ReservationsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Guests</Label>
+                    <Label>{t("reservations.guestCount")}</Label>
                     <Input
                       type="number"
                       min="1"
@@ -269,23 +271,23 @@ export default function ReservationsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Assign Table</Label>
+                  <Label>{t("reservations.assignTable")}</Label>
                   <Select
                     value={form.tableId}
                     onValueChange={(v) => setForm({ ...form, tableId: v })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="No table (assign later)" />
+                      <SelectValue placeholder={t("reservations.noTable")} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableTables.length === 0 ? (
                         <SelectItem value="__none" disabled>
-                          No available tables
+                          {t("reservations.noAvailableTables")}
                         </SelectItem>
                       ) : (
                         availableTables.map((tbl) => (
                           <SelectItem key={tbl.id} value={tbl.id}>
-                            Table {tbl.number} — {tbl.zone} ({tbl.capacity}p)
+                            {t("orders.table")} {tbl.number} — {tbl.zone} ({tbl.capacity}p)
                           </SelectItem>
                         ))
                       )}
@@ -293,13 +295,13 @@ export default function ReservationsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Notes</Label>
+                  <Label>{t("common.notes")}</Label>
                   <Input
                     value={form.notes}
                     onChange={(e) =>
                       setForm({ ...form, notes: e.target.value })
                     }
-                    placeholder="Special requests..."
+                    placeholder={t("reservations.notesPlaceholder")}
                   />
                 </div>
                 <Button
@@ -307,7 +309,7 @@ export default function ReservationsPage() {
                   onClick={createReservation}
                   disabled={creating}
                 >
-                  {creating ? "Creating..." : "Create Reservation"}
+                  {creating ? t("common.creating") : t("reservations.createAction")}
                 </Button>
               </div>
             </DialogContent>
@@ -321,29 +323,28 @@ export default function ReservationsPage() {
           <DialogHeader>
             <DialogTitle>
               <Armchair className="mr-2 inline h-5 w-5" />
-              Assign Table & Seat
+              {t("reservations.assignAndSeat")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This reservation has no table assigned. Please select a table
-              before seating.
+              {t("reservations.assignAndSeatHelp")}
             </p>
             <div className="space-y-2">
-              <Label>Table *</Label>
+              <Label>{t("orders.table")} *</Label>
               <Select value={assignTableId} onValueChange={setAssignTableId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a table" />
+                  <SelectValue placeholder={t("reservations.selectTable")} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableTables.length === 0 ? (
                     <SelectItem value="__none" disabled>
-                      No available tables
+                      {t("reservations.noAvailableTables")}
                     </SelectItem>
                   ) : (
                     availableTables.map((tbl) => (
                       <SelectItem key={tbl.id} value={tbl.id}>
-                        Table {tbl.number} — {tbl.zone} ({tbl.capacity}p)
+                        {t("orders.table")} {tbl.number} — {tbl.zone} ({tbl.capacity}p)
                       </SelectItem>
                     ))
                   )}
@@ -355,7 +356,7 @@ export default function ReservationsPage() {
               onClick={assignTableAndSeat}
               disabled={!assignTableId}
             >
-              <Armchair className="mr-1 h-4 w-4" /> Assign & Seat
+              <Armchair className="mr-1 h-4 w-4" /> {t("reservations.assignAndSeat")}
             </Button>
           </div>
         </DialogContent>
@@ -368,7 +369,7 @@ export default function ReservationsPage() {
       ) : reservations.length === 0 ? (
         <Card>
           <CardContent className="flex h-40 items-center justify-center text-muted-foreground">
-            No reservations found
+            {t("reservations.noReservations")}
           </CardContent>
         </Card>
       ) : (
@@ -379,7 +380,7 @@ export default function ReservationsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">{r.customerName}</CardTitle>
                   <Badge variant="outline" className={statusColors[r.status]}>
-                    {r.status}
+                    {t(`reservations.${r.status}`)}
                   </Badge>
                 </div>
               </CardHeader>
@@ -398,7 +399,7 @@ export default function ReservationsPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <Users className="h-3.5 w-3.5" />
-                    {r.guestCount} guests
+                    {r.guestCount} {t("orders.guests")}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -406,7 +407,7 @@ export default function ReservationsPage() {
                 </p>
                 {r.table ? (
                   <Badge variant="secondary">
-                    <Armchair className="mr-1 h-3 w-3" /> Table {r.table.number}{" "}
+                    <Armchair className="mr-1 h-3 w-3" /> {t("orders.table")} {r.table.number}{" "}
                     ({r.table.zone})
                   </Badge>
                 ) : (
@@ -414,7 +415,7 @@ export default function ReservationsPage() {
                     variant="outline"
                     className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/20"
                   >
-                    No table assigned
+                    {t("reservations.noTableAssigned")}
                   </Badge>
                 )}
                 {r.notes && (
@@ -431,7 +432,7 @@ export default function ReservationsPage() {
                         className="flex-1"
                         onClick={() => updateStatus(r.id, "CONFIRMED")}
                       >
-                        Confirm
+                        {t("action.confirm")}
                       </Button>
                       <Button
                         size="sm"
@@ -439,7 +440,7 @@ export default function ReservationsPage() {
                         className="flex-1"
                         onClick={() => updateStatus(r.id, "CANCELLED")}
                       >
-                        Cancel
+                        {t("action.cancel")}
                       </Button>
                     </>
                   )}
@@ -451,7 +452,7 @@ export default function ReservationsPage() {
                         className="flex-1"
                         onClick={() => handleSeat(r)}
                       >
-                        <Armchair className="mr-1 h-3.5 w-3.5" /> Seat
+                        <Armchair className="mr-1 h-3.5 w-3.5" /> {t("reservations.seat")}
                       </Button>
                       <Button
                         size="sm"
@@ -459,7 +460,7 @@ export default function ReservationsPage() {
                         className="flex-1"
                         onClick={() => updateStatus(r.id, "NO_SHOW")}
                       >
-                        No Show
+                        {t("reservations.NOSHOW")}
                       </Button>
                     </>
                   )}
@@ -470,7 +471,7 @@ export default function ReservationsPage() {
                       className="flex-1"
                       onClick={() => updateStatus(r.id, "COMPLETED")}
                     >
-                      Complete
+                      {t("reservations.COMPLETED")}
                     </Button>
                   )}
                 </div>
