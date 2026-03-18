@@ -218,7 +218,7 @@ export default function UsersPage() {
             {restaurants.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={fetchUsers}>
+        <Button variant="outline" size="sm" onClick={() => fetchUsers()}>
           <RefreshCw className="mr-1 h-4 w-4" /> {t('common.refresh')}
         </Button>
       </div>
