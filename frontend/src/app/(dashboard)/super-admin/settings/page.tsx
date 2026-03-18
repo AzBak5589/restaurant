@@ -35,7 +35,9 @@ export default function PlatformSettingsPage() {
   if (user?.role !== "SUPER_ADMIN") {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-lg text-destructive font-semibold">Access denied</p>
+        <p className="text-lg text-destructive font-semibold">
+          {t("superAdmin.accessDenied")}
+        </p>
       </div>
     );
   }
@@ -63,7 +65,7 @@ export default function PlatformSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Settings className="h-4 w-4" /> General
+            <Settings className="h-4 w-4" /> {t("settings.general")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -95,7 +97,7 @@ export default function PlatformSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Globe className="h-4 w-4" /> Defaults
+            <Globe className="h-4 w-4" /> {t("superAdmin.defaults")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -191,7 +193,7 @@ export default function PlatformSettingsPage() {
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
           <Save className="mr-1 h-4 w-4" />
-          {saving ? "Saving..." : t("superAdmin.savePlatformSettings")}
+          {saving ? t("common.saving") : t("superAdmin.savePlatformSettings")}
         </Button>
       </div>
     </div>

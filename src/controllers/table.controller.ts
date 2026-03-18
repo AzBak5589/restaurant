@@ -6,9 +6,18 @@ import { TableStatus } from '@prisma/client';
 
 export const getTables = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { zone, status } = req.query;
+  const { zone, status, sort } = req.query;
 
   const where: Record<string, unknown> = { restaurantId, isActive: true };
+  const sortValue =
+    (sort as "number_asc" | "number_desc" | "capacity_asc" | "capacity_desc" | undefined) ??
+    "number_asc";
+  const orderByMap = {
+    number_asc: { number: "asc" },
+    number_desc: { number: "desc" },
+    capacity_asc: { capacity: "asc" },
+    capacity_desc: { capacity: "desc" },
+  } as const;
   if (zone) where.zone = zone;
   if (status) where.status = status;
 
@@ -30,7 +39,7 @@ export const getTables = async (req: Request, res: Response): Promise<void> => {
         take: 3,
       },
     },
-    orderBy: { number: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   res.json(tables);
@@ -180,6 +189,12 @@ export const mergeTable = async (req: Request, res: Response): Promise<void> => 
 
 export const getFloorPlan = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
+  const { sort } = req.query;
+  const sortValue = (sort as "number_asc" | "number_desc" | undefined) ?? "number_asc";
+  const orderByMap = {
+    number_asc: { number: "asc" },
+    number_desc: { number: "desc" },
+  } as const;
 
   const tables = await prisma.table.findMany({
     where: { restaurantId, isActive: true },
@@ -192,7 +207,7 @@ export const getFloorPlan = async (req: Request, res: Response): Promise<void> =
       posX: true,
       posY: true,
     },
-    orderBy: { number: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   const zones = [...new Set(tables.map((t) => t.zone).filter(Boolean))];

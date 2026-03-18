@@ -32,6 +32,8 @@ import {
   Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 interface RestaurantRow {
   id: string;
@@ -68,6 +70,10 @@ const emptyForm = {
 };
 
 export default function RestaurantsPage() {
+  const PAGE_SIZE = 12;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { t } = useI18n();
   const [restaurants, setRestaurants] = useState<RestaurantRow[]>([]);
@@ -75,42 +81,71 @@ export default function RestaurantsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
+  const [page, setPage] = useState(() => {
+    const raw = searchParams.get('page');
+    const parsed = raw ? Number.parseInt(raw, 10) : 1;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  });
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') fetchData();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, page]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page > 1) params.set('page', String(page));
+    else params.delete('page');
+
+    const query = params.toString();
+    const currentQuery = searchParams.toString();
+    if (query !== currentQuery) {
+      router.replace(query ? `${pathname}?${query}` : pathname);
+    }
+  }, [page, searchParams, router, pathname]);
+
+  useEffect(() => {
+    const raw = searchParams.get('page');
+    const parsed = raw ? Number.parseInt(raw, 10) : 1;
+    const normalized = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    if (normalized !== page) {
+      setPage(normalized);
+    }
+  }, [searchParams, page]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/super-admin/restaurants');
+      const res = await api.get('/super-admin/restaurants', {
+        params: { page, limit: PAGE_SIZE },
+      });
       setRestaurants(res.data);
-    } catch {
-      toast.error('Failed to load restaurants');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('superAdmin.error.loadRestaurants')));
     } finally {
       setLoading(false);
     }
   };
 
   if (user?.role !== 'SUPER_ADMIN') {
-    return <div className="flex h-64 items-center justify-center"><p className="text-lg text-destructive font-semibold">Access denied</p></div>;
+    return <div className="flex h-64 items-center justify-center"><p className="text-lg text-destructive font-semibold">{t('superAdmin.accessDenied')}</p></div>;
   }
 
   const createRestaurant = async () => {
     if (!form.name || !form.slug || !form.adminEmail || !form.adminPassword || !form.adminFirstName || !form.adminLastName) {
-      toast.error('Please fill all required fields');
+      toast.error(t('superAdmin.error.requiredFields'));
       return;
     }
     setCreating(true);
     try {
       await api.post('/super-admin/restaurants', form);
-      toast.success(`Restaurant "${form.name}" created!`);
+      toast.success(`${t('superAdmin.restaurants')} "${form.name}" ${t('superAdmin.toast.created')}`);
       setCreateOpen(false);
       setForm({ ...emptyForm });
+      setPage(1);
       fetchData();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to create restaurant';
-      toast.error(msg);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('superAdmin.error.createRestaurant')));
     } finally {
       setCreating(false);
     }
@@ -121,19 +156,20 @@ export default function RestaurantsPage() {
       await api.patch(`/super-admin/restaurants/${id}`, { isActive: !active });
       toast.success(active ? t('superAdmin.suspend') + ' ✓' : t('superAdmin.activate') + ' ✓');
       fetchData();
-    } catch { toast.error('Failed to update'); }
+    } catch (error) { toast.error(getApiErrorMessage(error, t('superAdmin.error.updateRestaurant'))); }
   };
 
   const deleteRestaurant = async (id: string, name: string) => {
     if (!confirm(t('superAdmin.deleteConfirm'))) return;
     try {
       await api.delete(`/super-admin/restaurants/${id}`);
-      toast.success(`"${name}" deleted`);
+      toast.success(`"${name}" ${t('superAdmin.toast.deleted')}`);
+      setPage(1);
       fetchData();
-    } catch { toast.error('Failed to delete'); }
+    } catch (error) { toast.error(getApiErrorMessage(error, t('superAdmin.error.deleteRestaurant'))); }
   };
 
-  const copyId = (id: string) => { navigator.clipboard.writeText(id); toast.success('Restaurant ID copied!'); };
+  const copyId = (id: string) => { navigator.clipboard.writeText(id); toast.success(t('superAdmin.toast.idCopied')); };
 
   const planColors: Record<string, string> = {
     free: 'bg-gray-500/10 text-gray-600',
@@ -146,7 +182,7 @@ export default function RestaurantsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{t('superAdmin.restaurantManagement')}</h1>
-          <p className="text-muted-foreground">{restaurants.length} restaurants</p>
+          <p className="text-muted-foreground">{restaurants.length} {t('superAdmin.restaurants').toLowerCase()}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchData}>
@@ -161,7 +197,7 @@ export default function RestaurantsPage() {
                 <DialogTitle>{t('superAdmin.createRestaurant')}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="rounded-md bg-muted/50 px-3 py-2 text-sm font-medium">Restaurant</div>
+                <div className="rounded-md bg-muted/50 px-3 py-2 text-sm font-medium">{t('superAdmin.restaurants')}</div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>{t('superAdmin.restaurantName')} *</Label>
@@ -191,7 +227,7 @@ export default function RestaurantsPage() {
                     </Select>
                   </div>
                 </div>
-                <div className="rounded-md bg-muted/50 px-3 py-2 text-sm font-medium">Admin</div>
+                <div className="rounded-md bg-muted/50 px-3 py-2 text-sm font-medium">{t('superAdmin.adminSection')}</div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1"><Label>{t('superAdmin.adminFirstName')} *</Label><Input value={form.adminFirstName} onChange={(e) => setForm({ ...form, adminFirstName: e.target.value })} /></div>
                   <div className="space-y-1"><Label>{t('superAdmin.adminLastName')} *</Label><Input value={form.adminLastName} onChange={(e) => setForm({ ...form, adminLastName: e.target.value })} /></div>
@@ -241,7 +277,7 @@ export default function RestaurantsPage() {
                     <p className="text-[10px] text-muted-foreground">{t('superAdmin.created')}: {new Date(r.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" title="Copy Restaurant ID" onClick={() => copyId(r.id)}><Copy className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" title={t('superAdmin.copyRestaurantId')} onClick={() => copyId(r.id)}><Copy className="h-3.5 w-3.5" /></Button>
                     <Button size="sm" variant={r.isActive ? 'outline' : 'default'} onClick={() => toggleActive(r.id, r.isActive)}>
                       {r.isActive ? <><PowerOff className="mr-1 h-3.5 w-3.5" /> {t('superAdmin.suspend')}</> : <><Power className="mr-1 h-3.5 w-3.5" /> {t('superAdmin.activate')}</>}
                     </Button>
@@ -253,6 +289,25 @@ export default function RestaurantsPage() {
           ))}
         </div>
       )}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1 || loading}
+        >
+          {t('common.back')}
+        </Button>
+        <span className="text-sm text-muted-foreground">{t('superAdmin.page')} {page}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => p + 1)}
+          disabled={loading || restaurants.length < PAGE_SIZE}
+        >
+          {t('common.next')}
+        </Button>
+      </div>
     </div>
   );
 }

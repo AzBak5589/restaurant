@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import axios from 'axios';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Clock, Flame, MapPin, Phone, Search, UtensilsCrossed } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+import api from '@/lib/api';
 
 interface MenuItem {
   id: string;
@@ -56,7 +54,7 @@ export default function PublicMenuPage() {
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/digital-menu/public/${slug}`);
+        const res = await api.get(`/digital-menu/public/${slug}`);
         setRestaurant(res.data.restaurant);
         setCategories(res.data.categories);
         if (res.data.categories.length > 0) {

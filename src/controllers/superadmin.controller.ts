@@ -1,14 +1,41 @@
 import { Request, Response } from "express";
 import prisma from "../config/database";
 import { hashPassword } from "../utils/password";
+import { parsePagination } from "../utils/pagination";
 
 // GET /super-admin/restaurants — list all restaurants with stats
 export const listRestaurants = async (
-  _req: Request,
+  req: Request,
   res: Response,
 ): Promise<void> => {
+  const { limit, skip } = parsePagination(
+    req.query.page,
+    req.query.limit,
+    100,
+    20,
+  );
+  const search = req.query.search as string | undefined;
+  const isActiveQuery = req.query.isActive as string | undefined;
+  const plan = req.query.plan as string | undefined;
+
+  const where: Record<string, unknown> = {};
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { slug: { contains: search, mode: "insensitive" } },
+      { city: { contains: search, mode: "insensitive" } },
+      { country: { contains: search, mode: "insensitive" } },
+    ];
+  }
+  if (isActiveQuery === "true") where.isActive = true;
+  if (isActiveQuery === "false") where.isActive = false;
+  if (plan && plan !== "all") where.plan = plan;
+
   const restaurants = await prisma.restaurant.findMany({
+    where,
     orderBy: { createdAt: "desc" },
+    skip,
+    take: limit,
     include: {
       _count: {
         select: {
@@ -25,9 +52,11 @@ export const listRestaurants = async (
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const restaurantIds = restaurants.map((restaurant) => restaurant.id);
   const revenueByRestaurant = await prisma.order.groupBy({
     by: ["restaurantId"],
     where: {
+      restaurantId: { in: restaurantIds },
       paymentStatus: "PAID",
       createdAt: { gte: today },
     },
@@ -224,6 +253,7 @@ export const listAllUsers = async (
   res: Response,
 ): Promise<void> => {
   const { role, restaurantId, search } = req.query;
+  const { skip, limit } = parsePagination(req.query.page, req.query.limit, 200, 50);
 
   const where: Record<string, unknown> = {};
   if (role && role !== "all") where.role = role;
@@ -252,7 +282,8 @@ export const listAllUsers = async (
       restaurant: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
-    take: 200,
+    skip,
+    take: limit,
   });
 
   res.json(users);
@@ -288,13 +319,22 @@ export const updateUser = async (
 
 // GET /super-admin/logs — platform activity logs (recent orders, user creations, etc.)
 export const platformLogs = async (
-  _req: Request,
+  req: Request,
   res: Response,
 ): Promise<void> => {
+  const { page, limit, skip } = parsePagination(
+    req.query.page,
+    req.query.limit,
+    200,
+    50,
+  );
+  const type = req.query.type as string | undefined;
+  const sourceTake = Math.min(300, page * limit);
+
   // Aggregate recent activity from multiple sources
   const [recentOrders, recentUsers, recentRestaurants] = await Promise.all([
     prisma.order.findMany({
-      take: 30,
+      take: sourceTake,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -307,7 +347,7 @@ export const platformLogs = async (
       },
     }),
     prisma.user.findMany({
-      take: 20,
+      take: sourceTake,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -320,7 +360,7 @@ export const platformLogs = async (
       },
     }),
     prisma.restaurant.findMany({
-      take: 10,
+      take: sourceTake,
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, createdAt: true },
     }),
@@ -353,15 +393,18 @@ export const platformLogs = async (
     .sort(
       (a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    )
-    .slice(0, 50);
+    );
 
-  res.json(logs);
+  const filteredLogs = type
+    ? logs.filter((log) => log.type === type)
+    : logs;
+
+  res.json(filteredLogs.slice(skip, skip + limit));
 };
 
 // GET /super-admin/security — security overview
 export const securityOverview = async (
-  _req: Request,
+  req: Request,
   res: Response,
 ): Promise<void> => {
   const today = new Date();
@@ -390,7 +433,10 @@ export const securityOverview = async (
         restaurant: { select: { name: true } },
       },
       orderBy: { lastLogin: "desc" },
-      take: 20,
+      take: Math.min(
+        Number.parseInt(String(req.query.loginLimit ?? "20"), 10) || 20,
+        100,
+      ),
     }),
     prisma.restaurant.count({ where: { isActive: false } }),
     prisma.restaurant.count(),

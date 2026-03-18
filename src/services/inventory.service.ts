@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { getIO } from '../config/socket';
 import logger from '../config/logger';
+import { Prisma } from '@prisma/client';
 
 interface OrderItemForDeduction {
   menuItemId: string;
@@ -11,10 +12,13 @@ export const deductStockForOrder = async (
   restaurantId: string,
   orderItems: OrderItemForDeduction[],
   userId: string,
-  orderNumber: string
+  orderNumber: string,
+  tx?: Prisma.TransactionClient,
 ): Promise<void> => {
+  const db = tx ?? prisma;
+
   for (const orderItem of orderItems) {
-    const recipe = await prisma.recipe.findUnique({
+    const recipe = await db.recipe.findUnique({
       where: {
         restaurantId_menuItemId: {
           restaurantId,
@@ -40,25 +44,23 @@ export const deductStockForOrder = async (
 
       const newStock = item.currentStock - totalQuantity;
 
-      await prisma.$transaction([
-        prisma.inventoryItem.update({
-          where: { id: item.id },
-          data: { currentStock: Math.max(0, newStock) },
-        }),
-        prisma.inventoryMovement.create({
-          data: {
-            restaurantId,
-            itemId: item.id,
-            type: 'OUT',
-            quantity: totalQuantity,
-            unitCost: item.unitCost,
-            totalCost: item.unitCost ? item.unitCost * totalQuantity : undefined,
-            reference: `ORDER:${orderNumber}`,
-            notes: `Auto-deduction for order ${orderNumber}`,
-            createdBy: userId,
-          },
-        }),
-      ]);
+      await db.inventoryItem.update({
+        where: { id: item.id },
+        data: { currentStock: Math.max(0, newStock) },
+      });
+      await db.inventoryMovement.create({
+        data: {
+          restaurantId,
+          itemId: item.id,
+          type: 'OUT',
+          quantity: totalQuantity,
+          unitCost: item.unitCost,
+          totalCost: item.unitCost ? item.unitCost * totalQuantity : undefined,
+          reference: `ORDER:${orderNumber}`,
+          notes: `Auto-deduction for order ${orderNumber}`,
+          createdBy: userId,
+        },
+      });
 
       if (newStock <= item.minStock) {
         logger.warn(
@@ -80,15 +82,18 @@ export const restoreStockForOrder = async (
   restaurantId: string,
   orderId: string,
   userId: string,
-  orderNumber: string
+  orderNumber: string,
+  tx?: Prisma.TransactionClient,
 ): Promise<void> => {
-  const orderItems = await prisma.orderItem.findMany({
+  const db = tx ?? prisma;
+
+  const orderItems = await db.orderItem.findMany({
     where: { orderId },
     select: { menuItemId: true, quantity: true },
   });
 
   for (const orderItem of orderItems) {
-    const recipe = await prisma.recipe.findUnique({
+    const recipe = await db.recipe.findUnique({
       where: {
         restaurantId_menuItemId: {
           restaurantId,
@@ -109,29 +114,27 @@ export const restoreStockForOrder = async (
     for (const ingredient of recipe.ingredients) {
       const totalQuantity = ingredient.quantity * orderItem.quantity * recipe.portionSize;
 
-      await prisma.$transaction([
-        prisma.inventoryItem.update({
-          where: { id: ingredient.item.id },
-          data: {
-            currentStock: { increment: totalQuantity },
-          },
-        }),
-        prisma.inventoryMovement.create({
-          data: {
-            restaurantId,
-            itemId: ingredient.item.id,
-            type: 'RETURN',
-            quantity: totalQuantity,
-            unitCost: ingredient.item.unitCost,
-            totalCost: ingredient.item.unitCost
-              ? ingredient.item.unitCost * totalQuantity
-              : undefined,
-            reference: `CANCEL:${orderNumber}`,
-            notes: `Stock restored from cancelled order ${orderNumber}`,
-            createdBy: userId,
-          },
-        }),
-      ]);
+      await db.inventoryItem.update({
+        where: { id: ingredient.item.id },
+        data: {
+          currentStock: { increment: totalQuantity },
+        },
+      });
+      await db.inventoryMovement.create({
+        data: {
+          restaurantId,
+          itemId: ingredient.item.id,
+          type: 'RETURN',
+          quantity: totalQuantity,
+          unitCost: ingredient.item.unitCost,
+          totalCost: ingredient.item.unitCost
+            ? ingredient.item.unitCost * totalQuantity
+            : undefined,
+          reference: `CANCEL:${orderNumber}`,
+          notes: `Stock restored from cancelled order ${orderNumber}`,
+          createdBy: userId,
+        },
+      });
     }
   }
 };

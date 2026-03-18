@@ -11,6 +11,11 @@ import {
 } from '../controllers/customer.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validateTenant } from '../middlewares/tenant.middleware';
+import { validate } from '../middlewares/validation.middleware';
+import {
+  getCustomerByIdSchema,
+  getCustomersSchema,
+} from '../validators/customer.validation';
 
 const router = Router();
 
@@ -18,8 +23,8 @@ router.use(authenticate);
 router.use(validateTenant);
 
 // ─── Customers ────────────────────────────────────────────────
-router.get('/', getCustomers);
-router.get('/:id', getCustomerById);
+router.get('/', validate(getCustomersSchema), getCustomers);
+router.get('/:id', validate(getCustomerByIdSchema), getCustomerById);
 router.post('/', authorize('ADMIN', 'MANAGER', 'WAITER', 'CASHIER'), createCustomer);
 router.patch('/:id', authorize('ADMIN', 'MANAGER'), updateCustomer);
 

@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { QrCode, RefreshCw, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
+import { useI18n } from '@/lib/i18n';
 
 interface QRCodeData {
   tableId: string;
@@ -18,6 +20,7 @@ interface QRCodeData {
 }
 
 export default function QRCodesPage() {
+  const { t } = useI18n();
   const [qrCodes, setQrCodes] = useState<QRCodeData[]>([]);
   const [loading, setLoading] = useState(true);
   const [baseUrl, setBaseUrl] = useState('http://localhost:3001');
@@ -27,8 +30,8 @@ export default function QRCodesPage() {
     try {
       const res = await api.get('/digital-menu/qr', { params: { baseUrl } });
       setQrCodes(res.data);
-    } catch {
-      toast.error('Failed to generate QR codes');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('qr.error.generate')));
     } finally {
       setLoading(false);
     }
@@ -48,21 +51,21 @@ export default function QRCodesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">QR Codes</h1>
-          <p className="text-muted-foreground">Digital menu QR codes for each table</p>
+          <h1 className="text-2xl font-bold">{t('qr.title')}</h1>
+          <p className="text-muted-foreground">{t('qr.subtitle')}</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchQRCodes}>
-          <RefreshCw className="mr-1 h-4 w-4" /> Regenerate
+          <RefreshCw className="mr-1 h-4 w-4" /> {t('qr.regenerate')}
         </Button>
       </div>
 
       <Card>
         <CardContent className="flex items-end gap-3 p-4">
           <div className="flex-1 space-y-2">
-            <Label>Base URL for menu links</Label>
-            <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://your-app.com" />
+            <Label>{t('qr.baseUrlLabel')}</Label>
+            <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={t('qr.baseUrlPlaceholder')} />
           </div>
-          <Button onClick={fetchQRCodes}>Generate</Button>
+          <Button onClick={fetchQRCodes}>{t('qr.generate')}</Button>
         </CardContent>
       </Card>
 
@@ -74,7 +77,7 @@ export default function QRCodesPage() {
         <Card>
           <CardContent className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
             <QrCode className="h-8 w-8" />
-            No tables found. Create tables first.
+            {t('qr.noTables')}
           </CardContent>
         </Card>
       ) : (
@@ -82,19 +85,19 @@ export default function QRCodesPage() {
           {qrCodes.map((qr) => (
             <Card key={qr.tableId}>
               <CardHeader className="pb-2 text-center">
-                <CardTitle className="text-base">Table {qr.tableNumber}</CardTitle>
+                <CardTitle className="text-base">{t('orders.table')} {qr.tableNumber}</CardTitle>
                 <p className="text-sm text-muted-foreground">{qr.zone}</p>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={qr.qrCode}
-                  alt={`QR Code for Table ${qr.tableNumber}`}
+                  alt={`${t('qr.forTable')} ${qr.tableNumber}`}
                   className="h-48 w-48 rounded-lg border p-2"
                 />
                 <p className="max-w-full truncate text-xs text-muted-foreground">{qr.menuUrl}</p>
                 <Button size="sm" variant="outline" className="w-full" onClick={() => downloadQR(qr)}>
-                  <Download className="mr-1 h-4 w-4" /> Download
+                  <Download className="mr-1 h-4 w-4" /> {t('qr.download')}
                 </Button>
               </CardContent>
             </Card>

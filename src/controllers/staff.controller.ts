@@ -8,9 +8,26 @@ import { ShiftStatus, UserRole } from '@prisma/client';
 
 export const getStaff = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { role, isActive } = req.query;
+  const { role, isActive, sort } = req.query;
 
   const where: Record<string, unknown> = { restaurantId };
+  const sortValue =
+    (sort as
+      | 'firstName_asc'
+      | 'firstName_desc'
+      | 'lastName_asc'
+      | 'lastName_desc'
+      | 'createdAt_desc'
+      | 'createdAt_asc'
+      | undefined) ?? 'firstName_asc';
+  const orderByMap = {
+    firstName_asc: { firstName: 'asc' },
+    firstName_desc: { firstName: 'desc' },
+    lastName_asc: { lastName: 'asc' },
+    lastName_desc: { lastName: 'desc' },
+    createdAt_desc: { createdAt: 'desc' },
+    createdAt_asc: { createdAt: 'asc' },
+  } as const;
   if (role) where.role = role;
   if (isActive !== undefined) where.isActive = isActive === 'true';
 
@@ -28,7 +45,7 @@ export const getStaff = async (req: Request, res: Response): Promise<void> => {
       lastLogin: true,
       createdAt: true,
     },
-    orderBy: { firstName: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   res.json(staff);
@@ -156,9 +173,14 @@ export const toggleStaffActive = async (req: Request, res: Response): Promise<vo
 
 export const getShifts = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { userId, startDate, endDate, status } = req.query;
+  const { userId, startDate, endDate, status, sort } = req.query;
 
   const where: Record<string, unknown> = { restaurantId };
+  const sortValue = (sort as 'startTime_asc' | 'startTime_desc' | undefined) ?? 'startTime_asc';
+  const orderByMap = {
+    startTime_asc: { startTime: 'asc' },
+    startTime_desc: { startTime: 'desc' },
+  } as const;
   if (userId) where.userId = userId;
   if (status) where.status = status;
 
@@ -174,7 +196,7 @@ export const getShifts = async (req: Request, res: Response): Promise<void> => {
     include: {
       user: { select: { id: true, firstName: true, lastName: true, role: true } },
     },
-    orderBy: { startTime: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   res.json(shifts);
@@ -295,7 +317,12 @@ export const clockOut = async (req: Request, res: Response): Promise<void> => {
 
 export const getClockHistory = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { userId, startDate, endDate } = req.query;
+  const { userId, startDate, endDate, sort } = req.query;
+  const sortValue = (sort as 'clockIn_desc' | 'clockIn_asc' | undefined) ?? 'clockIn_desc';
+  const orderByMap = {
+    clockIn_desc: { clockIn: 'desc' },
+    clockIn_asc: { clockIn: 'asc' },
+  } as const;
 
   const where: Record<string, unknown> = {
     user: { restaurantId },
@@ -315,7 +342,7 @@ export const getClockHistory = async (req: Request, res: Response): Promise<void
     include: {
       user: { select: { id: true, firstName: true, lastName: true, role: true } },
     },
-    orderBy: { clockIn: 'desc' },
+    orderBy: orderByMap[sortValue],
     take: 200,
   });
 

@@ -1,17 +1,31 @@
-import { Request, Response } from 'express';
-import prisma from '../config/database';
-import { AppError } from '../middlewares/error.middleware';
+import { Request, Response } from "express";
+import prisma from "../config/database";
+import { AppError } from "../middlewares/error.middleware";
 
-export const getCategories = async (req: Request, res: Response): Promise<void> => {
+export const getCategories = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const restaurantId = req.user!.restaurantId;
+    const { sort } = req.query;
+    const sortValue =
+      (sort as "sortOrder_asc" | "sortOrder_desc" | "name_asc" | "name_desc" | undefined) ??
+      "sortOrder_asc";
+    const orderByMap = {
+      sortOrder_asc: { sortOrder: "asc" },
+      sortOrder_desc: { sortOrder: "desc" },
+      name_asc: { name: "asc" },
+      name_desc: { name: "desc" },
+    } as const;
 
     const categories = await prisma.menuCategory.findMany({
       where: { restaurantId, isActive: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: orderByMap[sortValue],
       include: {
-        _count: {
-          select: { menuItems: true },
+        menuItems: {
+          where: { isActive: true },
+          orderBy: { name: "asc" },
         },
       },
     });
@@ -22,7 +36,10 @@ export const getCategories = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-export const createCategory = async (req: Request, res: Response): Promise<void> => {
+export const createCategory = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { name, description, image, sortOrder } = req.body;
     const restaurantId = req.user!.restaurantId;
@@ -43,7 +60,10 @@ export const createCategory = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const updateCategory = async (req: Request, res: Response): Promise<void> => {
+export const updateCategory = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { id } = req.params;
     const restaurantId = req.user!.restaurantId;
@@ -53,7 +73,7 @@ export const updateCategory = async (req: Request, res: Response): Promise<void>
     });
 
     if (!category) {
-      throw new AppError('Category not found', 404);
+      throw new AppError("Category not found", 404);
     }
 
     const updatedCategory = await prisma.menuCategory.update({
@@ -67,7 +87,10 @@ export const updateCategory = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const deleteCategory = async (req: Request, res: Response): Promise<void> => {
+export const deleteCategory = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { id } = req.params;
     const restaurantId = req.user!.restaurantId;
@@ -77,7 +100,7 @@ export const deleteCategory = async (req: Request, res: Response): Promise<void>
     });
 
     if (!category) {
-      throw new AppError('Category not found', 404);
+      throw new AppError("Category not found", 404);
     }
 
     await prisma.menuCategory.update({
@@ -91,19 +114,39 @@ export const deleteCategory = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const getMenuItems = async (req: Request, res: Response): Promise<void> => {
+export const getMenuItems = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const restaurantId = req.user!.restaurantId;
-    const { categoryId, isAvailable } = req.query;
+    const { categoryId, isAvailable, sort } = req.query;
 
     const where: any = { restaurantId, isActive: true };
+    const sortValue =
+      (sort as
+        | "name_asc"
+        | "name_desc"
+        | "price_asc"
+        | "price_desc"
+        | "preparationTime_asc"
+        | "preparationTime_desc"
+        | undefined) ?? "name_asc";
+    const orderByMap = {
+      name_asc: { name: "asc" },
+      name_desc: { name: "desc" },
+      price_asc: { price: "asc" },
+      price_desc: { price: "desc" },
+      preparationTime_asc: { preparationTime: "asc" },
+      preparationTime_desc: { preparationTime: "desc" },
+    } as const;
 
     if (categoryId) {
       where.categoryId = categoryId;
     }
 
     if (isAvailable !== undefined) {
-      where.isAvailable = isAvailable === 'true';
+      where.isAvailable = isAvailable === "true";
     }
 
     const menuItems = await prisma.menuItem.findMany({
@@ -111,7 +154,7 @@ export const getMenuItems = async (req: Request, res: Response): Promise<void> =
       include: {
         category: true,
       },
-      orderBy: { name: 'asc' },
+      orderBy: orderByMap[sortValue],
     });
 
     res.json(menuItems);
@@ -120,7 +163,10 @@ export const getMenuItems = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const getMenuItemById = async (req: Request, res: Response): Promise<void> => {
+export const getMenuItemById = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { id } = req.params;
     const restaurantId = req.user!.restaurantId;
@@ -142,7 +188,7 @@ export const getMenuItemById = async (req: Request, res: Response): Promise<void
     });
 
     if (!menuItem) {
-      throw new AppError('Menu item not found', 404);
+      throw new AppError("Menu item not found", 404);
     }
 
     res.json(menuItem);
@@ -151,7 +197,10 @@ export const getMenuItemById = async (req: Request, res: Response): Promise<void
   }
 };
 
-export const createMenuItem = async (req: Request, res: Response): Promise<void> => {
+export const createMenuItem = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const {
       categoryId,
@@ -192,7 +241,10 @@ export const createMenuItem = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const updateMenuItem = async (req: Request, res: Response): Promise<void> => {
+export const updateMenuItem = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { id } = req.params;
     const restaurantId = req.user!.restaurantId;
@@ -202,7 +254,7 @@ export const updateMenuItem = async (req: Request, res: Response): Promise<void>
     });
 
     if (!menuItem) {
-      throw new AppError('Menu item not found', 404);
+      throw new AppError("Menu item not found", 404);
     }
 
     const updatedMenuItem = await prisma.menuItem.update({
@@ -219,7 +271,10 @@ export const updateMenuItem = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const deleteMenuItem = async (req: Request, res: Response): Promise<void> => {
+export const deleteMenuItem = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { id } = req.params;
     const restaurantId = req.user!.restaurantId;
@@ -229,7 +284,7 @@ export const deleteMenuItem = async (req: Request, res: Response): Promise<void>
     });
 
     if (!menuItem) {
-      throw new AppError('Menu item not found', 404);
+      throw new AppError("Menu item not found", 404);
     }
 
     await prisma.menuItem.update({
@@ -243,7 +298,10 @@ export const deleteMenuItem = async (req: Request, res: Response): Promise<void>
   }
 };
 
-export const toggleAvailability = async (req: Request, res: Response): Promise<void> => {
+export const toggleAvailability = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const { id } = req.params;
     const restaurantId = req.user!.restaurantId;
@@ -253,7 +311,7 @@ export const toggleAvailability = async (req: Request, res: Response): Promise<v
     });
 
     if (!menuItem) {
-      throw new AppError('Menu item not found', 404);
+      throw new AppError("Menu item not found", 404);
     }
 
     const updatedMenuItem = await prisma.menuItem.update({

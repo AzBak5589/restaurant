@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useI18n } from '@/lib/i18n';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Building2, Globe, Save, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface RestaurantSettings {
   name: string;
@@ -27,6 +29,7 @@ interface RestaurantSettings {
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [settings, setSettings] = useState<RestaurantSettings>({
     name: '', slug: '', email: '', phone: '', address: '',
     currency: 'FCFA', taxRate: 19.25, timezone: 'Africa/Douala',
@@ -79,9 +82,9 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       await api.patch('/restaurants/current', settings);
-      toast.success('Restaurant settings saved');
-    } catch {
-      toast.error('Failed to save settings');
+      toast.success(t('settings.toast.saved'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('settings.error.save')));
     } finally {
       setSaving(false);
     }
@@ -91,9 +94,9 @@ export default function SettingsPage() {
     setSavingProfile(true);
     try {
       await api.patch('/staff/me', profileForm);
-      toast.success('Profile updated');
-    } catch {
-      toast.error('Failed to update profile');
+      toast.success(t('settings.profile.toast.updated'));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('settings.profile.error.update')));
     } finally {
       setSavingProfile(false);
     }
@@ -110,28 +113,28 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage restaurant and account settings</p>
+        <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
+        <p className="text-muted-foreground">{t('settings.subtitle')}</p>
       </div>
 
       {/* Restaurant Settings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Building2 className="h-4 w-4" /> Restaurant Information
+            <Building2 className="h-4 w-4" /> {t('settings.restaurantInfo')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Restaurant Name</Label>
+              <Label>{t('settings.restaurantName')}</Label>
               <Input
                 value={settings.name}
                 onChange={(e) => setSettings({ ...settings, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Slug (URL identifier)</Label>
+              <Label>{t('settings.slug')}</Label>
               <Input
                 value={settings.slug}
                 onChange={(e) => setSettings({ ...settings, slug: e.target.value })}
@@ -140,7 +143,7 @@ export default function SettingsPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label>{t('common.email')}</Label>
               <Input
                 type="email"
                 value={settings.email}
@@ -148,7 +151,7 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Phone</Label>
+              <Label>{t('common.phone')}</Label>
               <Input
                 value={settings.phone}
                 onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
@@ -156,7 +159,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Address</Label>
+            <Label>{t('settings.address')}</Label>
             <Input
               value={settings.address}
               onChange={(e) => setSettings({ ...settings, address: e.target.value })}
@@ -167,7 +170,7 @@ export default function SettingsPage() {
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label>Currency</Label>
+              <Label>{t('settings.currency')}</Label>
               <Select
                 value={settings.currency}
                 onValueChange={(v) => setSettings({ ...settings, currency: v })}
@@ -182,7 +185,7 @@ export default function SettingsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Tax Rate (%)</Label>
+              <Label>{t('settings.taxRate')} (%)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -191,7 +194,7 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Timezone</Label>
+              <Label>{t('settings.timezone')}</Label>
               <Select
                 value={settings.timezone}
                 onValueChange={(v) => setSettings({ ...settings, timezone: v })}
@@ -211,7 +214,7 @@ export default function SettingsPage() {
           <div className="flex justify-end pt-2">
             <Button onClick={saveSettings} disabled={saving}>
               <Save className="mr-1 h-4 w-4" />
-              {saving ? 'Saving...' : 'Save Restaurant Settings'}
+              {saving ? t('common.saving') : t('settings.saveRestaurant')}
             </Button>
           </div>
         </CardContent>
@@ -221,20 +224,20 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <User className="h-4 w-4" /> Your Profile
+            <User className="h-4 w-4" /> {t('settings.profile.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>First Name</Label>
+              <Label>{t('staff.firstName')}</Label>
               <Input
                 value={profileForm.firstName}
                 onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Last Name</Label>
+              <Label>{t('staff.lastName')}</Label>
               <Input
                 value={profileForm.lastName}
                 onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
@@ -242,7 +245,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label>{t('common.email')}</Label>
             <Input
               type="email"
               value={profileForm.email}
@@ -252,7 +255,7 @@ export default function SettingsPage() {
           <div className="flex justify-end pt-2">
             <Button onClick={saveProfile} disabled={savingProfile}>
               <Save className="mr-1 h-4 w-4" />
-              {savingProfile ? 'Saving...' : 'Update Profile'}
+              {savingProfile ? t('common.saving') : t('settings.profile.updateAction')}
             </Button>
           </div>
         </CardContent>
@@ -262,15 +265,15 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Globe className="h-4 w-4" /> About
+            <Globe className="h-4 w-4" /> {t('settings.about.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p><strong>RestoPOS</strong> — Multi-tenant Restaurant Management & POS System</p>
-            <p>Version 1.0.0</p>
+            <p><strong>RestoPOS</strong> — {t('settings.about.description')}</p>
+            <p>{t('settings.about.version')} 1.0.0</p>
             <p>
-              Public menu URL:{' '}
+              {t('settings.about.publicMenuUrl')}{' '}
               <code className="rounded bg-muted px-1.5 py-0.5">
                 /menu/{settings.slug}
               </code>

@@ -10,13 +10,31 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, RefreshCw, UtensilsCrossed } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Plus,
+  RefreshCw,
+  UtensilsCrossed,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Eye,
+  EyeOff,
+  Ban,
+} from "lucide-react";
 import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
+import { useI18n } from "@/lib/i18n";
 
 interface MenuItem {
   id: string;
@@ -41,21 +59,32 @@ interface Category {
   menuItems: MenuItem[];
 }
 
+const emptyItemForm = {
+  name: "",
+  description: "",
+  price: "",
+  cost: "",
+  preparationTime: "",
+  categoryId: "",
+};
+
 export default function MenuPage() {
+  const { t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [catDialogOpen, setCatDialogOpen] = useState(false);
-  const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+
+  // Category dialogs
+  const [catDialogOpen, setCatDialogOpen] = useState(false);
+  const [catEditMode, setCatEditMode] = useState(false);
+  const [editingCatId, setEditingCatId] = useState("");
   const [catForm, setCatForm] = useState({ name: "", description: "" });
-  const [itemForm, setItemForm] = useState({
-    name: "",
-    description: "",
-    price: "",
-    cost: "",
-    preparationTime: "",
-    categoryId: "",
-  });
+
+  // Item dialogs
+  const [itemDialogOpen, setItemDialogOpen] = useState(false);
+  const [itemEditMode, setItemEditMode] = useState(false);
+  const [editingItemId, setEditingItemId] = useState("");
+  const [itemForm, setItemForm] = useState({ ...emptyItemForm });
 
   const fetchMenu = async () => {
     setLoading(true);
@@ -65,8 +94,8 @@ export default function MenuPage() {
       if (res.data.length > 0 && !selectedCategoryId) {
         setSelectedCategoryId(res.data[0].id);
       }
-    } catch {
-      toast.error("Failed to load menu");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("menu.error.load")));
     } finally {
       setLoading(false);
     }
@@ -76,42 +105,118 @@ export default function MenuPage() {
     fetchMenu(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const createCategory = async () => {
+  // ── Category CRUD ──────────────────────────────────
+  const openCreateCategory = () => {
+    setCatEditMode(false);
+    setEditingCatId("");
+    setCatForm({ name: "", description: "" });
+    setCatDialogOpen(true);
+  };
+
+  const openEditCategory = (cat: Category) => {
+    setCatEditMode(true);
+    setEditingCatId(cat.id);
+    setCatForm({ name: cat.name, description: cat.description || "" });
+    setCatDialogOpen(true);
+  };
+
+  const saveCategory = async () => {
+    if (!catForm.name.trim()) {
+      toast.error(t("menu.error.requiredName"));
+      return;
+    }
     try {
-      await api.post("/menu/categories", catForm);
-      toast.success("Category created");
+      if (catEditMode) {
+        await api.patch(`/menu/categories/${editingCatId}`, catForm);
+        toast.success(t("menu.toast.categoryUpdated"));
+      } else {
+        await api.post("/menu/categories", catForm);
+        toast.success(t("menu.toast.categoryCreated"));
+      }
       setCatDialogOpen(false);
-      setCatForm({ name: "", description: "" });
       fetchMenu();
-    } catch {
-      toast.error("Failed to create category");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("menu.error.saveCategory")));
     }
   };
 
-  const createItem = async () => {
+  const deleteCategory = async (catId: string, catName: string) => {
+    if (
+      !confirm(
+        `${t("menu.confirm.deleteCategory")} "${catName}"?`,
+      )
+    )
+      return;
     try {
-      await api.post("/menu/items", {
-        ...itemForm,
-        categoryId: itemForm.categoryId || selectedCategoryId,
-        price: parseFloat(itemForm.price),
-        cost: itemForm.cost ? parseFloat(itemForm.cost) : undefined,
-        preparationTime: itemForm.preparationTime
-          ? parseInt(itemForm.preparationTime)
-          : undefined,
-      });
-      toast.success("Menu item created");
-      setItemDialogOpen(false);
-      setItemForm({
-        name: "",
-        description: "",
-        price: "",
-        cost: "",
-        preparationTime: "",
-        categoryId: "",
-      });
+      await api.delete(`/menu/categories/${catId}`);
+      toast.success(`"${catName}" ${t("menu.toast.deleted")}`);
+      if (selectedCategoryId === catId) setSelectedCategoryId("");
       fetchMenu();
-    } catch {
-      toast.error("Failed to create item");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("menu.error.deleteCategory")));
+    }
+  };
+
+  // ── Item CRUD ──────────────────────────────────────
+  const openCreateItem = () => {
+    setItemEditMode(false);
+    setEditingItemId("");
+    setItemForm({ ...emptyItemForm, categoryId: selectedCategoryId });
+    setItemDialogOpen(true);
+  };
+
+  const openEditItem = (item: MenuItem) => {
+    setItemEditMode(true);
+    setEditingItemId(item.id);
+    setItemForm({
+      name: item.name,
+      description: item.description || "",
+      price: String(item.price),
+      cost: item.cost ? String(item.cost) : "",
+      preparationTime: item.preparationTime ? String(item.preparationTime) : "",
+      categoryId: selectedCategoryId,
+    });
+    setItemDialogOpen(true);
+  };
+
+  const saveItem = async () => {
+    if (!itemForm.name.trim() || !itemForm.price) {
+      toast.error(t("menu.error.requiredNamePrice"));
+      return;
+    }
+    const payload = {
+      name: itemForm.name,
+      description: itemForm.description,
+      categoryId: itemForm.categoryId || selectedCategoryId,
+      price: parseFloat(itemForm.price),
+      cost: itemForm.cost ? parseFloat(itemForm.cost) : undefined,
+      preparationTime: itemForm.preparationTime
+        ? parseInt(itemForm.preparationTime)
+        : undefined,
+    };
+    try {
+      if (itemEditMode) {
+        await api.patch(`/menu/items/${editingItemId}`, payload);
+        toast.success(t("menu.toast.itemUpdated"));
+      } else {
+        await api.post("/menu/items", payload);
+        toast.success(t("menu.toast.itemCreated"));
+      }
+      setItemDialogOpen(false);
+      fetchMenu();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("menu.error.saveItem")));
+    }
+  };
+
+  const deleteItem = async (itemId: string, itemName: string) => {
+    if (!confirm(`${t("menu.confirm.deleteItem")} "${itemName}"?`)) return;
+    try {
+      await api.delete(`/menu/items/${itemId}`);
+      toast.success(`"${itemName}" ${t("menu.toast.deleted")}`);
+      fetchMenu();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("menu.error.deleteItem")));
     }
   };
 
@@ -119,15 +224,14 @@ export default function MenuPage() {
     try {
       await api.patch(`/menu/items/${itemId}`, { isAvailable: !isAvailable });
       toast.success(
-        isAvailable ? "Item marked unavailable" : "Item marked available",
+        isAvailable ? t("menu.toast.markedUnavailable") : t("menu.toast.markedAvailable"),
       );
       fetchMenu();
-    } catch {
-      toast.error("Failed to update item");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("menu.error.updateItem")));
     }
   };
 
-  const activeCategory = categories.find((c) => c.id === selectedCategoryId);
   const totalItems = categories.reduce(
     (s, c) => s + (c.menuItems?.length ?? 0),
     0,
@@ -135,125 +239,150 @@ export default function MenuPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Menu</h1>
+          <h1 className="text-2xl font-bold">{t("menu.title")}</h1>
           <p className="text-muted-foreground">
-            {categories.length} categories, {totalItems} items
+            {categories.length} {t("menu.categoriesCount")}, {totalItems} {t("menu.totalItems")}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchMenu}>
-            <RefreshCw className="mr-1 h-4 w-4" /> Refresh
+            <RefreshCw className="mr-1 h-4 w-4" /> {t("common.refresh")}
           </Button>
-          <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline">
-                <Plus className="mr-1 h-4 w-4" /> Category
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New Category</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input
-                    value={catForm.name}
-                    onChange={(e) =>
-                      setCatForm({ ...catForm, name: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Input
-                    value={catForm.description}
-                    onChange={(e) =>
-                      setCatForm({ ...catForm, description: e.target.value })
-                    }
-                  />
-                </div>
-                <Button className="w-full" onClick={createCategory}>
-                  Create Category
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="mr-1 h-4 w-4" /> Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New Menu Item</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input
-                    value={itemForm.name}
-                    onChange={(e) =>
-                      setItemForm({ ...itemForm, name: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Input
-                    value={itemForm.description}
-                    onChange={(e) =>
-                      setItemForm({ ...itemForm, description: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Price (FCFA)</Label>
-                    <Input
-                      type="number"
-                      value={itemForm.price}
-                      onChange={(e) =>
-                        setItemForm({ ...itemForm, price: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Cost (FCFA)</Label>
-                    <Input
-                      type="number"
-                      value={itemForm.cost}
-                      onChange={(e) =>
-                        setItemForm({ ...itemForm, cost: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Prep Time (min)</Label>
-                  <Input
-                    type="number"
-                    value={itemForm.preparationTime}
-                    onChange={(e) =>
-                      setItemForm({
-                        ...itemForm,
-                        preparationTime: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <Button className="w-full" onClick={createItem}>
-                  Create Item
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" variant="outline" onClick={openCreateCategory}>
+            <Plus className="mr-1 h-4 w-4" /> {t("menu.category")}
+          </Button>
+          <Button
+            size="sm"
+            onClick={openCreateItem}
+            disabled={categories.length === 0}
+          >
+            <Plus className="mr-1 h-4 w-4" /> {t("menu.addItem")}
+          </Button>
         </div>
       </div>
 
+      {/* Category Dialog (create / edit) */}
+      <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {catEditMode ? t("menu.editCategory") : t("menu.newCategory")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t("common.name")} *</Label>
+              <Input
+                value={catForm.name}
+                onChange={(e) =>
+                  setCatForm({ ...catForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("expenses.description")}</Label>
+              <Input
+                value={catForm.description}
+                onChange={(e) =>
+                  setCatForm({ ...catForm, description: e.target.value })
+                }
+              />
+            </div>
+            <Button className="w-full" onClick={saveCategory}>
+              {catEditMode ? t("menu.updateCategory") : t("menu.createCategory")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Item Dialog (create / edit) */}
+      <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {itemEditMode ? t("menu.editItem") : t("menu.newItem")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t("common.name")} *</Label>
+              <Input
+                value={itemForm.name}
+                onChange={(e) =>
+                  setItemForm({ ...itemForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("expenses.description")}</Label>
+              <Input
+                value={itemForm.description}
+                onChange={(e) =>
+                  setItemForm({ ...itemForm, description: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>{t("menu.price")} (FCFA) *</Label>
+                <Input
+                  type="number"
+                  value={itemForm.price}
+                  onChange={(e) =>
+                    setItemForm({ ...itemForm, price: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("menu.cost")} (FCFA)</Label>
+                <Input
+                  type="number"
+                  value={itemForm.cost}
+                  onChange={(e) =>
+                    setItemForm({ ...itemForm, cost: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("menu.prepTime")} (min)</Label>
+              <Input
+                type="number"
+                value={itemForm.preparationTime}
+                onChange={(e) =>
+                  setItemForm({ ...itemForm, preparationTime: e.target.value })
+                }
+              />
+            </div>
+            {!itemEditMode && categories.length > 1 && (
+              <div className="space-y-2">
+                <Label>{t("menu.category")}</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={itemForm.categoryId}
+                  onChange={(e) =>
+                    setItemForm({ ...itemForm, categoryId: e.target.value })
+                  }
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <Button className="w-full" onClick={saveItem}>
+              {itemEditMode ? t("menu.updateItem") : t("menu.createItem")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Content */}
       {loading ? (
         <div className="flex h-40 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -261,24 +390,74 @@ export default function MenuPage() {
       ) : categories.length === 0 ? (
         <Card>
           <CardContent className="flex h-40 items-center justify-center text-muted-foreground">
-            No menu categories yet. Create one to get started.
+            {t("menu.emptyCategories")}
           </CardContent>
         </Card>
       ) : (
         <Tabs value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-          <TabsList className="flex-wrap">
-            {categories.map((cat) => (
-              <TabsTrigger key={cat.id} value={cat.id}>
-                {cat.name} ({cat.menuItems?.length ?? 0})
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="flex items-center gap-2">
+            <TabsList className="flex-wrap flex-1">
+              {categories.map((cat) => {
+                const unavailCount = (cat.menuItems ?? []).filter(
+                  (i) => !i.isAvailable,
+                ).length;
+                return (
+                  <TabsTrigger key={cat.id} value={cat.id} className="gap-1.5">
+                    {cat.name} ({cat.menuItems?.length ?? 0})
+                    {unavailCount > 0 && (
+                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/15 px-1 text-[10px] font-medium text-red-600">
+                        {unavailCount}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </div>
+
           {categories.map((cat) => (
-            <TabsContent key={cat.id} value={cat.id}>
+            <TabsContent key={cat.id} value={cat.id} className="space-y-4">
+              {/* Category header with edit/delete */}
+              <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2">
+                <div>
+                  <h2 className="font-semibold">{cat.name}</h2>
+                  {cat.description && (
+                    <p className="text-sm text-muted-foreground">
+                      {cat.description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => openEditCategory(cat)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => deleteCategory(cat.id, cat.name)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+
               {(cat.menuItems?.length ?? 0) === 0 ? (
                 <Card>
-                  <CardContent className="flex h-32 items-center justify-center text-muted-foreground">
-                    No items in this category
+                  <CardContent className="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <UtensilsCrossed className="h-8 w-8" />
+                    <p>{t("menu.emptyCategoryItems")}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={openCreateItem}
+                    >
+                      <Plus className="mr-1 h-4 w-4" /> {t("menu.addFirstItem")}
+                    </Button>
                   </CardContent>
                 </Card>
               ) : (
@@ -286,21 +465,75 @@ export default function MenuPage() {
                   {(cat.menuItems ?? []).map((item) => (
                     <Card
                       key={item.id}
-                      className={!item.isAvailable ? "opacity-60" : ""}
+                      className={
+                        !item.isAvailable
+                          ? "border-red-200 bg-red-50/30 dark:border-red-900/50 dark:bg-red-950/10"
+                          : ""
+                      }
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
-                            <CardTitle className="text-base">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <UtensilsCrossed className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <CardTitle
+                              className={`text-base truncate ${!item.isAvailable ? "line-through text-muted-foreground" : ""}`}
+                            >
                               {item.name}
                             </CardTitle>
                           </div>
-                          <Badge
-                            variant={item.isAvailable ? "default" : "secondary"}
-                          >
-                            {item.isAvailable ? "Available" : "Unavailable"}
-                          </Badge>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {!item.isAvailable && (
+                              <Badge
+                                variant="destructive"
+                                className="text-xs gap-1"
+                              >
+                                <Ban className="h-3 w-3" /> {t("menu.unavailable")}
+                              </Badge>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => openEditItem(item)}
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" /> {t("common.edit")}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    toggleAvailability(
+                                      item.id,
+                                      item.isAvailable,
+                                    )
+                                  }
+                                >
+                                  {item.isAvailable ? (
+                                    <>
+                                      <EyeOff className="mr-2 h-4 w-4" /> {t("menu.markUnavailable")}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye className="mr-2 h-4 w-4" /> {t("menu.markAvailable")}
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => deleteItem(item.id, item.name)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> {t("common.delete")}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-2">
@@ -310,12 +543,14 @@ export default function MenuPage() {
                           </p>
                         )}
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-bold">
+                          <span
+                            className={`text-lg font-bold ${!item.isAvailable ? "text-muted-foreground" : ""}`}
+                          >
                             {item.price.toLocaleString()} FCFA
                           </span>
-                          {item.cost && (
+                          {item.cost != null && item.cost > 0 && (
                             <span className="text-sm text-muted-foreground">
-                              Cost: {item.cost.toLocaleString()} | Margin:{" "}
+                              {t("menu.cost")}: {item.cost.toLocaleString()} | {t("recipes.margin")}:{" "}
                               {Math.round(
                                 ((item.price - item.cost) / item.price) * 100,
                               )}
@@ -324,14 +559,15 @@ export default function MenuPage() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {item.preparationTime && (
+                          {item.preparationTime != null &&
+                            item.preparationTime > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                {item.preparationTime} {t("menu.minutesShort")}
+                              </Badge>
+                            )}
+                          {item.calories != null && item.calories > 0 && (
                             <Badge variant="outline" className="text-xs">
-                              {item.preparationTime} min
-                            </Badge>
-                          )}
-                          {item.calories && (
-                            <Badge variant="outline" className="text-xs">
-                              {item.calories} cal
+                              {item.calories} {t("menu.caloriesShort")}
                             </Badge>
                           )}
                           {item.tags.map((tag) => (
@@ -346,21 +582,9 @@ export default function MenuPage() {
                         </div>
                         {item.allergens.length > 0 && (
                           <p className="text-xs text-amber-600">
-                            Allergens: {item.allergens.join(", ")}
+                            {t("menu.allergens")}: {item.allergens.join(", ")}
                           </p>
                         )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full"
-                          onClick={() =>
-                            toggleAvailability(item.id, item.isAvailable)
-                          }
-                        >
-                          {item.isAvailable
-                            ? "Mark Unavailable"
-                            : "Mark Available"}
-                        </Button>
                       </CardContent>
                     </Card>
                   ))}

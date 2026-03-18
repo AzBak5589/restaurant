@@ -4,6 +4,12 @@ import { AppError } from '../middlewares/error.middleware';
 
 export const getRecipes = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
+  const { sort } = req.query;
+  const sortValue = (sort as 'menuItemName_asc' | 'menuItemName_desc' | undefined) ?? 'menuItemName_asc';
+  const orderByMap = {
+    menuItemName_asc: { menuItem: { name: 'asc' } },
+    menuItemName_desc: { menuItem: { name: 'desc' } },
+  } as const;
 
   const recipes = await prisma.recipe.findMany({
     where: { restaurantId },
@@ -19,7 +25,7 @@ export const getRecipes = async (req: Request, res: Response): Promise<void> => 
         },
       },
     },
-    orderBy: { menuItem: { name: 'asc' } },
+    orderBy: orderByMap[sortValue],
   });
 
   res.json(recipes);
@@ -222,6 +228,14 @@ export const deleteRecipe = async (req: Request, res: Response): Promise<void> =
 
 export const getMenuItemCostAnalysis = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
+  const { sort } = req.query;
+  const sortValue =
+    (sort as
+      | 'marginPercent_desc'
+      | 'marginPercent_asc'
+      | 'costRatio_desc'
+      | 'costRatio_asc'
+      | undefined) ?? 'marginPercent_desc';
 
   const recipes = await prisma.recipe.findMany({
     where: { restaurantId },
@@ -264,9 +278,16 @@ export const getMenuItemCostAnalysis = async (req: Request, res: Response): Prom
     ? analysis.reduce((sum, a) => sum + a.costRatio, 0) / analysis.length
     : 0;
 
+  const sortedItems = [...analysis].sort((a, b) => {
+    if (sortValue === 'marginPercent_desc') return b.marginPercent - a.marginPercent;
+    if (sortValue === 'marginPercent_asc') return a.marginPercent - b.marginPercent;
+    if (sortValue === 'costRatio_desc') return b.costRatio - a.costRatio;
+    return a.costRatio - b.costRatio;
+  });
+
   res.json({
     averageCostRatio: Math.round(avgCostRatio * 100) / 100,
-    itemCount: analysis.length,
-    items: analysis.sort((a, b) => b.marginPercent - a.marginPercent),
+    itemCount: sortedItems.length,
+    items: sortedItems,
   });
 };

@@ -13,19 +13,25 @@ import {
 } from '../controllers/menu.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validateTenant } from '../middlewares/tenant.middleware';
+import { validate } from '../middlewares/validation.middleware';
+import {
+  getCategoriesSchema,
+  getMenuItemByIdSchema,
+  getMenuItemsSchema,
+} from '../validators/menu.validation';
 
 const router = Router();
 
 router.use(authenticate);
 router.use(validateTenant);
 
-router.get('/categories', getCategories);
+router.get('/categories', validate(getCategoriesSchema), getCategories);
 router.post('/categories', authorize('ADMIN', 'MANAGER'), createCategory);
 router.patch('/categories/:id', authorize('ADMIN', 'MANAGER'), updateCategory);
 router.delete('/categories/:id', authorize('ADMIN', 'MANAGER'), deleteCategory);
 
-router.get('/items', getMenuItems);
-router.get('/items/:id', getMenuItemById);
+router.get('/items', validate(getMenuItemsSchema), getMenuItems);
+router.get('/items/:id', validate(getMenuItemByIdSchema), getMenuItemById);
 router.post('/items', authorize('ADMIN', 'MANAGER'), createMenuItem);
 router.patch('/items/:id', authorize('ADMIN', 'MANAGER'), updateMenuItem);
 router.delete('/items/:id', authorize('ADMIN', 'MANAGER'), deleteMenuItem);

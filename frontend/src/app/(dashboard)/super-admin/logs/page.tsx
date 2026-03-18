@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { RefreshCw, ShoppingCart, UserPlus, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api-error';
 
 interface LogEntry {
   type: string;
@@ -27,29 +28,34 @@ interface LogEntry {
 }
 
 export default function LogsPage() {
+  const PAGE_SIZE = 30;
   const { user } = useAuth();
   const { t } = useI18n();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') fetchLogs();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, page]);
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/super-admin/logs');
+      const res = await api.get('/super-admin/logs', {
+        params: { page, limit: PAGE_SIZE },
+      });
       setLogs(res.data);
-    } catch {
-      toast.error('Failed to load logs');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t('superAdmin.error.loadLogs')));
     } finally {
       setLoading(false);
     }
   };
 
   if (user?.role !== 'SUPER_ADMIN') {
-    return <div className="flex h-64 items-center justify-center"><p className="text-lg text-destructive font-semibold">Access denied</p></div>;
+    return <div className="flex h-64 items-center justify-center"><p className="text-lg text-destructive font-semibold">{t('superAdmin.accessDenied')}</p></div>;
   }
 
   const typeIcons: Record<string, React.ReactNode> = {
@@ -115,7 +121,26 @@ export default function LogsPage() {
           )}
         </CardContent>
       </Card>
-      <p className="text-xs text-muted-foreground">{logs.length} entries</p>
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1 || loading}
+        >
+          {t('common.back')}
+        </Button>
+        <span className="text-sm text-muted-foreground">{t('superAdmin.page')} {page}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => p + 1)}
+          disabled={loading || logs.length < PAGE_SIZE}
+        >
+          {t('common.next')}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">{logs.length} {t('superAdmin.entries')}</p>
     </div>
   );
 }

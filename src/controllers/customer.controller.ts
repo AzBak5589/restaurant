@@ -6,9 +6,26 @@ import { AppError } from '../middlewares/error.middleware';
 
 export const getCustomers = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
-  const { search, isActive } = req.query;
+  const { search, isActive, sort } = req.query;
 
   const where: Record<string, unknown> = { restaurantId };
+  const sortValue =
+    (sort as
+      | 'firstName_asc'
+      | 'firstName_desc'
+      | 'lastName_asc'
+      | 'lastName_desc'
+      | 'createdAt_desc'
+      | 'createdAt_asc'
+      | undefined) ?? 'firstName_asc';
+  const orderByMap = {
+    firstName_asc: { firstName: 'asc' },
+    firstName_desc: { firstName: 'desc' },
+    lastName_asc: { lastName: 'asc' },
+    lastName_desc: { lastName: 'desc' },
+    createdAt_desc: { createdAt: 'desc' },
+    createdAt_asc: { createdAt: 'asc' },
+  } as const;
   if (isActive !== undefined) where.isActive = isActive === 'true';
 
   if (search) {
@@ -22,7 +39,7 @@ export const getCustomers = async (req: Request, res: Response): Promise<void> =
 
   const customers = await prisma.customer.findMany({
     where,
-    orderBy: { firstName: 'asc' },
+    orderBy: orderByMap[sortValue],
   });
 
   res.json(customers);

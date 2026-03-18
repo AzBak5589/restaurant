@@ -1,17 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyAccessToken } from "../utils/jwt";
 import { UserRole } from "@prisma/client";
+import { AppError } from "./error.middleware";
 
 export const authenticate = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): void => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({ error: "No token provided" });
+      next(new AppError("No token provided", 401));
       return;
     }
 
@@ -28,19 +29,19 @@ export const authenticate = (
 
     next();
   } catch (error) {
-    res.status(401).json({ error: "Invalid or expired token" });
+    next(new AppError("Invalid or expired token", 401));
   }
 };
 
 export const authorize = (...roles: UserRole[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ error: "Unauthorized" });
+      next(new AppError("Unauthorized", 401));
       return;
     }
 
     if (!roles.includes(req.user.role)) {
-      res.status(403).json({ error: "Forbidden: Insufficient permissions" });
+      next(new AppError("Forbidden: Insufficient permissions", 403));
       return;
     }
 

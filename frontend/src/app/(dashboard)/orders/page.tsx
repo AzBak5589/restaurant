@@ -24,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Plus, RefreshCw, Clock, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { getApiErrorMessage } from "@/lib/api-error";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 interface OrderItem {
   id: string;
@@ -58,6 +60,7 @@ interface MenuItemOption {
   id: string;
   name: string;
   price: number;
+  isAvailable: boolean;
   category: { name: string };
 }
 
@@ -83,11 +86,34 @@ const paymentColors: Record<string, string> = {
   REFUNDED: "bg-red-500/10 text-red-600",
 };
 
+const allowedStatusFilters = [
+  "all",
+  "PENDING",
+  "CONFIRMED",
+  "PREPARING",
+  "READY",
+  "SERVED",
+  "PAID",
+  "CANCELLED",
+] as const;
+
+const normalizeStatusFilter = (value: string | null): string => {
+  if (value && allowedStatusFilters.includes(value as (typeof allowedStatusFilters)[number])) {
+    return value;
+  }
+  return "all";
+};
+
 export default function OrdersPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>(() => {
+    return normalizeStatusFilter(searchParams.get("status"));
+  });
+  const [search, setSearch] = useState(() => searchParams.get("q") || "");
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [tables, setTables] = useState<TableOption[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemOption[]>([]);
@@ -101,6 +127,30 @@ export default function OrdersPage() {
     useState<ActiveTableOrder | null>(null);
   const { t } = useI18n();
 
+  const syncFiltersToUrl = useCallback(
+    (nextStatus: string, nextSearch: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (nextStatus === "all") {
+        params.delete("status");
+      } else {
+        params.set("status", nextStatus);
+      }
+
+      if (!nextSearch) {
+        params.delete("q");
+      } else {
+        params.set("q", nextSearch);
+      }
+
+      const query = params.toString();
+      const currentQuery = searchParams.toString();
+      if (query !== currentQuery) {
+        router.replace(query ? `${pathname}?${query}` : pathname);
+      }
+    },
+    [pathname, router, searchParams],
+  );
+
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
@@ -108,16 +158,33 @@ export default function OrdersPage() {
       if (statusFilter !== "all") params.status = statusFilter;
       const res = await api.get("/orders", { params });
       setOrders(res.data);
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, t]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    syncFiltersToUrl(statusFilter, search.trim());
+  }, [search, statusFilter, syncFiltersToUrl]);
+
+  useEffect(() => {
+    const nextStatus = normalizeStatusFilter(searchParams.get("status"));
+    const nextSearch = searchParams.get("q") || "";
+
+    if (nextStatus !== statusFilter) {
+      setStatusFilter(nextStatus);
+    }
+
+    if (nextSearch !== search) {
+      setSearch(nextSearch);
+    }
+  }, [searchParams, search, statusFilter]);
 
   useEffect(() => {
     if (newOrderOpen) {
@@ -193,8 +260,8 @@ export default function OrdersPage() {
       setGuestCount("1");
       setActiveTableOrder(null);
       fetchOrders();
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
     } finally {
       setCreating(false);
     }
@@ -203,10 +270,21 @@ export default function OrdersPage() {
   const updateStatus = async (orderId: string, status: string) => {
     try {
       await api.patch(`/orders/${orderId}/status`, { status });
-      toast.success(`${t(("status." + status) as any)}`);
+      toast.success(t(`status.${status}`));
       fetchOrders();
-    } catch {
-      toast.error(t("common.noResults"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.noResults")));
+    }
+  };
+
+  const cancelOrder = async (order: Order) => {
+    if (!confirm(`${t("orders.confirm.cancel")} ${order.orderNumber}?`)) return;
+    try {
+      await api.delete(`/orders/${order.id}`);
+      toast.success(`${order.orderNumber} ${t("orders.toast.cancelled")}`);
+      fetchOrders();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("orders.error.cancel")));
     }
   };
 
@@ -301,8 +379,16 @@ export default function OrdersPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {menuItems.map((mi) => (
-                            <SelectItem key={mi.id} value={mi.id}>
+                            <SelectItem
+                              key={mi.id}
+                              value={mi.id}
+                              disabled={!mi.isAvailable}
+                              className={
+                                !mi.isAvailable ? "opacity-50 line-through" : ""
+                              }
+                            >
                               {mi.name} - {mi.price.toLocaleString()} FCFA
+                              {!mi.isAvailable ? ` (${t("menu.unavailable")})` : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -409,7 +495,7 @@ export default function OrdersPage() {
                     className={statusColors[order.status] || ""}
                     variant="outline"
                   >
-                    {t(`status.${order.status}` as any)}
+                    {t(`status.${order.status}`)}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -446,7 +532,7 @@ export default function OrdersPage() {
                       className={`ml-2 text-xs ${paymentColors[order.paymentStatus]}`}
                       variant="outline"
                     >
-                      {t(`payment.${order.paymentStatus}` as any)}
+                      {t(`payment.${order.paymentStatus}`)}
                     </Badge>
                   </div>
                 </div>
@@ -491,13 +577,14 @@ export default function OrdersPage() {
                       {t("action.served")}
                     </Button>
                   )}
-                  {(order.status === "PENDING" ||
-                    order.status === "CONFIRMED") && (
+                  {["PENDING", "CONFIRMED", "PREPARING"].includes(
+                    order.status,
+                  ) && (
                     <Button
                       size="sm"
                       variant="destructive"
                       className="flex-1"
-                      onClick={() => updateStatus(order.id, "CANCELLED")}
+                      onClick={() => cancelOrder(order)}
                     >
                       {t("action.cancel")}
                     </Button>

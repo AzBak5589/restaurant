@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
 import { AppError } from '../middlewares/error.middleware';
-import { OrderStatus, PaymentStatus, PaymentMethod } from '@prisma/client';
+import { OrderStatus, PaymentStatus, PaymentMethod, Prisma } from '@prisma/client';
 import { getIO } from '../config/socket';
 
 // ─── PAYMENTS ─────────────────────────────────────────────────
@@ -9,63 +9,106 @@ import { getIO } from '../config/socket';
 export const processPayment = async (req: Request, res: Response): Promise<void> => {
   const restaurantId = req.user!.restaurantId;
   const { orderId, amount, method, reference, notes } = req.body;
+  const idempotencyKey =
+    (req.headers['x-idempotency-key'] as string | undefined) ||
+    (req.body.idempotencyKey as string | undefined);
 
-  const order = await prisma.order.findFirst({
-    where: { id: orderId, restaurantId },
-    include: { payments: true },
-  });
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, restaurantId },
+        include: { payments: true },
+      });
 
-  if (!order) {
-    throw new AppError('Order not found', 404);
-  }
+      if (!order) {
+        throw new AppError('Order not found', 404);
+      }
 
-  if (order.status === OrderStatus.CANCELLED) {
-    throw new AppError('Cannot pay for a cancelled order', 400);
-  }
+      if (order.status === OrderStatus.CANCELLED) {
+        throw new AppError('Cannot pay for a cancelled order', 400);
+      }
 
-  const totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0);
-  const remaining = order.total - totalPaid;
+      if (idempotencyKey) {
+        const existingPayment = await tx.payment.findFirst({
+          where: {
+            orderId,
+            OR: [
+              { reference: `IDEMP:${idempotencyKey}` },
+              { notes: { startsWith: `[idem:${idempotencyKey}]` } },
+            ],
+          },
+        });
 
-  if (amount > remaining + 0.01) {
-    throw new AppError(`Amount exceeds remaining balance: ${remaining}`, 400);
-  }
+        if (existingPayment) {
+          const existingTotalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0);
+          return {
+            payment: existingPayment,
+            orderTotal: order.total,
+            totalPaid: existingTotalPaid,
+            remaining: Math.max(0, order.total - existingTotalPaid),
+            paymentStatus: order.paymentStatus,
+            emitted: false,
+          };
+        }
+      }
 
-  const payment = await prisma.payment.create({
-    data: {
+      const totalPaid = order.payments.reduce((sum, p) => sum + p.amount, 0);
+      const remaining = order.total - totalPaid;
+
+      if (amount > remaining + 0.01) {
+        throw new AppError(`Amount exceeds remaining balance: ${remaining}`, 400);
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          orderId,
+          amount,
+          method: method as PaymentMethod,
+          reference: reference || (idempotencyKey ? `IDEMP:${idempotencyKey}` : undefined),
+          notes: idempotencyKey ? `[idem:${idempotencyKey}] ${notes || ''}`.trim() : notes,
+        },
+      });
+
+      const newTotalPaid = totalPaid + amount;
+      const isPaid = newTotalPaid >= order.total - 0.01;
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          paymentStatus: isPaid ? PaymentStatus.PAID : PaymentStatus.PARTIAL,
+          paymentMethod: method as PaymentMethod,
+          ...(isPaid && { status: OrderStatus.PAID, completedAt: new Date() }),
+        },
+      });
+
+      return {
+        payment,
+        orderTotal: order.total,
+        totalPaid: newTotalPaid,
+        remaining: Math.max(0, order.total - newTotalPaid),
+        paymentStatus: isPaid ? PaymentStatus.PAID : PaymentStatus.PARTIAL,
+        emitted: true,
+      };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
+
+  if (result.emitted) {
+    getIO().to(`restaurant:${restaurantId}`).emit('order:paid', {
       orderId,
-      amount,
-      method: method as PaymentMethod,
-      reference,
-      notes,
-    },
-  });
-
-  const newTotalPaid = totalPaid + amount;
-  const isPaid = newTotalPaid >= order.total - 0.01;
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      paymentStatus: isPaid ? PaymentStatus.PAID : PaymentStatus.PARTIAL,
-      paymentMethod: method as PaymentMethod,
-      ...(isPaid && { status: OrderStatus.PAID, completedAt: new Date() }),
-    },
-  });
-
-  getIO().to(`restaurant:${restaurantId}`).emit('order:paid', {
-    orderId,
-    payment,
-    paymentStatus: isPaid ? 'PAID' : 'PARTIAL',
-    totalPaid: newTotalPaid,
-    remaining: Math.max(0, order.total - newTotalPaid),
-  });
+      payment: result.payment,
+      paymentStatus: result.paymentStatus,
+      totalPaid: result.totalPaid,
+      remaining: result.remaining,
+    });
+  }
 
   res.status(201).json({
-    payment,
-    orderTotal: order.total,
-    totalPaid: newTotalPaid,
-    remaining: Math.max(0, order.total - newTotalPaid),
-    paymentStatus: isPaid ? 'PAID' : 'PARTIAL',
+    payment: result.payment,
+    orderTotal: result.orderTotal,
+    totalPaid: result.totalPaid,
+    remaining: result.remaining,
+    paymentStatus: result.paymentStatus,
   });
 };
 

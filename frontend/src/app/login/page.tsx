@@ -17,6 +17,7 @@ import {
 import { Loader2, ChefHat } from "lucide-react";
 import { toast } from "sonner";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("admin@demo-restaurant.com");
@@ -34,8 +35,8 @@ export default function LoginPage() {
       const user = await login(email, password, restaurantId);
       toast.success(t("auth.welcomeBack"));
       router.push(user?.role === "SUPER_ADMIN" ? "/super-admin" : "/dashboard");
-    } catch {
-      toast.error(t("auth.loginError"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("auth.loginError")));
     } finally {
       setLoading(false);
     }
